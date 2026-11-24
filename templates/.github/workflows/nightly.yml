@@ -22,7 +22,7 @@ jobs:
 
   dast:
     if: vars.STAGING_URL != ''
-    uses: beskar-ci/forge/.github/workflows/dast.yml@FORGE_PIN # main
+    uses: beskar-ci/forge/.github/workflows/dast.yml@a91616a17b8a943be8734acbccfcd261df46e528 # main
     with:
       target: ${{ vars.STAGING_URL }}
 
