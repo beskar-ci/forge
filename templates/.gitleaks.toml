@@ -1,0 +1,8 @@
+# Default gitleaks rules. Add an allowlist entry only for a verified false positive,
+# scoped as narrowly as possible (one file, or one regex), with the reason.
+[extend]
+useDefault = true
+
+# [allowlist]
+# description = "why this is not a secret"
+# paths = ['''path/to/file\.json''']

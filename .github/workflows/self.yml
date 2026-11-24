@@ -1,0 +1,69 @@
+# The harness goes through its own chain (templates/.github/workflows/pipeline.yml):
+#   PR → [G1 static] → [G2 unit] → [G3 integration] → [G5 security]
+# It deploys nothing, so there is no staging, G6 or production stage. Ruleset on main: require every gate
+# (G1 static, G2 unit, G3 integration, G5 security / secrets, G5 security / dependencies, G5 SAST / semgrep);
+# a job skipped because an earlier gate failed counts as passing, so requiring only the last one is not enough.
+name: self-check
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: self-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+
+jobs:
+  fast:
+    name: G1 static
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - run: for f in probe/*.mjs stages/*.mjs; do node --check "$f"; done
+      # Workflow linter (syntax, expressions, shell). Go is preinstalled; the module checksum database pins it.
+      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - run: ~/go/bin/actionlint .github/workflows/*.yml templates/.github/workflows/*.yml
+
+  unit:
+    name: G2 unit
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - run: node --test stages/check.test.mjs
+
+  integration:
+    name: G3 integration
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      # probe against real HTTP servers (a vulnerable one it must catch, a fixed one it must pass).
+      - run: node --test probe/probe.test.mjs
+
+  security:
+    name: G5 security
+    needs: integration
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      pull-requests: read
+
+  sast:
+    name: G5 SAST
+    needs: integration
+    uses: ./.github/workflows/sast.yml

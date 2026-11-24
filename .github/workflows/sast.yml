@@ -1,0 +1,39 @@
+# Reusable (G5): Semgrep, holding the line.
+#   - High/critical (ERROR) findings block anywhere in the repo: fix them before enabling the gate.
+#   - Everything else blocks only when new: compared with the PR base (or the previous commit on main).
+#   - SARIF is uploaded as an artifact (private repos on GitHub Pro have no code scanning tab).
+# Call with:  uses: beskar-ci/forge/.github/workflows/sast.yml@<sha>
+name: sast
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: semgrep/semgrep:1.186.0@sha256:6e1b04340e60e910fbb4ddbf3c857ab0918f064417ad5ac530014ccb3cf8c8f1
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # False positives: only a human may add `# nosemgrep: <rule-id>` with the reason. Agents fix the code, never the gate.
+      - name: high and critical, whole repo
+        run: semgrep scan --config p/default --severity ERROR --error --metrics=off
+      - name: new findings only
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            export SEMGREP_BASELINE_COMMIT="$BASE"
+          fi
+          semgrep scan --config p/default --error --metrics=off --sarif-output=semgrep.sarif
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: ignore

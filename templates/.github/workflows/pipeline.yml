@@ -1,0 +1,142 @@
+# The chain every change goes through (README section 2, gates G1-G6):
+#
+#   commit → PR → [G1 static] → [G2 unit] → [G3 integration] → [G5 security]
+#        → staging deploy → [G6 end-to-end] → merge → (same chain on main) → production deploy
+#
+# Each job needs the previous one, so a red gate stops the chain.
+# Ruleset on main: require EVERY gate as a status check (G1 static, G2 unit, G3 integration, G5 security / secrets,
+# G5 security / dependencies, G5 SAST / semgrep, G6 e2e). Never require only the last one: GitHub counts a job
+# skipped because an earlier gate failed as passing. G5 review is not required (it is skipped on untrusted PRs).
+# Harness workflows are pinned to a commit SHA; Dependabot (github-actions ecosystem) proposes updates.
+# Lines marked TODO(harden) are project-specific.
+name: pipeline
+on:
+  pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+
+jobs:
+  fast:
+    name: G1 static
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # TODO(harden): toolchain setup, then format check + lint + strict types, e.g.
+      #   npx prettier --check . && npx eslint . && npx tsc --noEmit
+      #   cargo fmt --check && cargo clippy --all-targets -- -D warnings
+      #   ruff format --check . && ruff check . && mypy .
+      - run: echo "replace with format, lint and type checks" && exit 1
+
+  unit:
+    name: G2 unit
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # TODO(harden): unit tests, external APIs replayed from recordings (MSW, respx, wiremock), e.g.
+      #   npx vitest run   |   cargo test   |   pytest   |   go test ./...
+      - run: echo "replace with unit tests" && exit 1
+
+  integration:
+    name: G3 integration
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # TODO(harden): start the real dependencies, then integration + authorisation tests, e.g.
+      #   supabase start && supabase test db && npm run test:integration
+      #   docker compose up -d --wait && pytest tests/integration
+      #   node forge/probe/probe.mjs app.probe.json   (against the locally started app)
+      - run: echo "replace with integration tests on real dependencies" && exit 1
+
+  security:
+    name: G5 security
+    needs: integration
+    uses: beskar-ci/forge/.github/workflows/security.yml@FORGE_PIN # main
+    permissions:
+      contents: read
+      pull-requests: read
+
+  sast:
+    name: G5 SAST
+    needs: integration
+    uses: beskar-ci/forge/.github/workflows/sast.yml@FORGE_PIN # main
+
+  review:
+    name: G5 review
+    needs: integration
+    # Trusted PRs only: the review is not hardened against prompt injection, and fork / Dependabot PRs have no secrets.
+    if: >-
+      github.event_name == 'pull_request' && !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+    uses: beskar-ci/forge/.github/workflows/claude-review.yml@FORGE_PIN # main
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  deploy-staging:
+    name: deploy staging
+    needs: [security, sast, review]
+    # The review is skipped on main and on untrusted PRs; that must not stop the chain.
+    if: ${{ !cancelled() && needs.security.result == 'success' && needs.sast.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.review.result) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    # A shared staging environment takes one deploy + e2e at a time; per-PR previews do not need this.
+    concurrency: staging
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # TODO(harden): deploy this commit to staging (or a per-PR preview) and output its URL, e.g.
+      #   echo "url=$(npx vercel deploy --token "$VERCEL_TOKEN")" >> "$GITHUB_OUTPUT"
+      #   npx wrangler deploy --env staging && echo "url=https://app-staging.example.workers.dev" >> "$GITHUB_OUTPUT"
+      - id: deploy
+        run: echo "replace with the staging deploy" && exit 1
+
+  e2e:
+    name: G6 e2e
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      # Playwright (JS) works against an app written in any language. playwright.config: use: { baseURL: process.env.BASE_URL }
+      - run: npm ci && npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          BASE_URL: ${{ needs.deploy-staging.outputs.url }}
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  deploy-production:
+    name: deploy production
+    needs: e2e
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Settings → Environments → production → required reviewers, for a manual approval before release.
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # TODO(harden): the production deploy of exactly this commit, e.g. `npx vercel deploy --prod`, `npx wrangler deploy`.
+      - run: echo "replace with the production deploy" && exit 1

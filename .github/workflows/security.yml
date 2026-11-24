@@ -1,0 +1,46 @@
+# Reusable: secret scan + dependency audits for whatever ecosystems the caller repo uses.
+# Call with:  uses: beskar-ci/forge/.github/workflows/security.yml@<sha>
+# and grant the job:  permissions: { contents: read, pull-requests: read }
+name: security
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # On pull requests gitleaks lists the PR's commits through the API.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      # False positives go in the caller's .gitleaks.toml (see templates/.gitleaks.toml).
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - if: hashFiles('package-lock.json') != ''
+        run: npm audit --audit-level=high
+      - if: hashFiles('pnpm-lock.yaml') != ''
+        run: npx -y pnpm@9.15.9 audit --audit-level high
+      - if: hashFiles('Cargo.lock') != ''
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
+        with:
+          tool: cargo-audit
+      # Unmaintained-crate warnings are reported but do not fail; vulnerabilities do.
+      - if: hashFiles('Cargo.lock') != ''
+        run: cargo audit
+      # ponytail: requirements.txt only; add uv.lock / poetry.lock when a project needs it.
+      - if: hashFiles('requirements.txt') != ''
+        run: pipx run pip-audit -r requirements.txt

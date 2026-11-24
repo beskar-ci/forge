@@ -1,0 +1,29 @@
+# Reusable (G5): OWASP ZAP baseline scan (passive, safe) against a running deployment.
+# Only scan URLs you own: staging or a preview, never someone else's site.
+# Call with:  uses: beskar-ci/forge/.github/workflows/dast.yml@<sha>
+#             with: { target: https://staging.example.com }
+name: dast
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Image: zaproxy stable, digest of 2026-11-24. Fails on FAIL-level alerts; warnings are listed in the log. Tune with a zap-rules.tsv in the repo (-c).
+      - env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          rules=()
+          if [ -f zap-rules.tsv ]; then rules=(-c zap-rules.tsv); fi
+          docker run --rm -v "$PWD:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af \
+            zap-baseline.py -t "$TARGET" -I "${rules[@]}"

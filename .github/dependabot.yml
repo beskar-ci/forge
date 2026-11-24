@@ -1,0 +1,7 @@
+# Keeps the SHA-pinned actions of this repo up to date (weekly, after a 7-day cooldown).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }

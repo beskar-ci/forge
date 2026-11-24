@@ -1,0 +1,35 @@
+{
+  "baseUrl": "http://127.0.0.1:8787",
+  "idFormat": "hex32",
+  "headersPath": "/",
+  "users": {
+    "owner": { "headers": { "Cookie": "session=$PROBE_TOKEN_A" } },
+    "other": { "headers": { "Authorization": "Bearer $PROBE_TOKEN_B" } }
+  },
+  "routes": [
+    {
+      "name": "save item",
+      "method": "PUT",
+      "path": "/api/items/{id}",
+      "auth": true,
+      "maxBytes": 1048576,
+      "body": { "title": "{fuzz}", "data": {} }
+    },
+    {
+      "name": "read item",
+      "method": "GET",
+      "path": "/api/items/{id}",
+      "auth": true,
+      "owned": {
+        "create": { "method": "PUT", "path": "/api/items/{id}", "body": { "title": "owner's", "data": {} } },
+        "read": { "method": "GET", "path": "/api/items/{id}" }
+      }
+    },
+    {
+      "name": "redeem coupon once",
+      "method": "POST",
+      "path": "/api/coupons/WELCOME/redeem",
+      "race": { "parallel": 20, "maxSuccess": 1 }
+    }
+  ]
+}

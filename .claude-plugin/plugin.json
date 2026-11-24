@@ -1,0 +1,8 @@
+{
+  "name": "forge",
+  "version": "0.1.0",
+  "description": "Harden any codebase: map trust boundaries, write adversarial tests (wrong user, limits, races, failures halfway), wire CI, secret scanning, dependency audits and a Claude PR review.",
+  "author": {
+    "name": "Beskar"
+  }
+}

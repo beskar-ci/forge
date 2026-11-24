@@ -1,0 +1,54 @@
+# Outside the chain, every night: contract tests against the real external APIs, DAST against staging,
+# load + fault injection. Any failure opens (or updates) one issue. Set the STAGING_URL repository variable.
+name: nightly
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # TODO(harden): call each real external API with a test account and assert the response shape
+      # matches the recorded fixtures used by the mocks (e.g. `npm run test:contract`).
+      - run: echo "replace with the contract test command" && exit 1
+
+  dast:
+    if: vars.STAGING_URL != ''
+    uses: beskar-ci/forge/.github/workflows/dast.yml@FORGE_PIN # main
+    with:
+      target: ${{ vars.STAGING_URL }}
+
+  resilience:
+    if: vars.STAGING_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - env:
+          BASE_URL: ${{ vars.STAGING_URL }}
+        run: docker run --rm -i -e BASE_URL grafana/k6:1.8.3@sha256:2cd9cd09e4119340a122aaf06f30cf3009c19db23b87954909fba0d3eda58e08 run - < load/smoke.k6.js
+      # TODO(harden): fault injection. Run the app's integration tests through Toxiproxy
+      # (ghcr.io/shopify/toxiproxy) with latency, reset_peer and limit_data toxics on the DB and external APIs,
+      # asserting a clear error and no lost data.
+
+  report:
+    needs: [contract, dast, resilience]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create alert:digest -R "$GITHUB_REPOSITORY" --color FBCA04 --description "Daily digest alert" --force
+          n=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --label alert:digest --search "Nightly checks failing in:title" --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" -R "$GITHUB_REPOSITORY" --body "Failed again: $RUN"
+          else gh issue create -R "$GITHUB_REPOSITORY" --title "Nightly checks failing" --label alert:digest --assignee "$GITHUB_REPOSITORY_OWNER" --body "Contract, DAST or resilience checks failed: $RUN"; fi

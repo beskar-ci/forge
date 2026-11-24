@@ -1,0 +1,13 @@
+{
+  "name": "forge",
+  "owner": {
+    "name": "Beskar"
+  },
+  "plugins": [
+    {
+      "name": "forge",
+      "source": "./",
+      "description": "Adversarial testing methodology, /harden skill and reusable CI workflows."
+    }
+  ]
+}

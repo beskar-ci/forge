@@ -1,0 +1,25 @@
+# G5: weekly dependency update PRs (also bumps the SHA-pinned actions and harness workflows). Keep only the ecosystems the project uses.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # let a bad release get caught by others first
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # let a bad release get caught by others first
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+  - package-ecosystem: cargo
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # let a bad release get caught by others first
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # let a bad release get caught by others first
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }   # let a bad release get caught by others first
