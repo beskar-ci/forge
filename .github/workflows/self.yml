@@ -1,7 +1,7 @@
 # The harness goes through its own chain (templates/.github/workflows/pipeline.yml):
-#   PR → [G1 static] → [G2 unit] → [G3 integration] → [G5 security]
+#   PR → [G0 hygiene] → [G1 static] → [G2 unit] → [G3 integration] → [G5 security]
 # It deploys nothing, so there is no staging, G6 or production stage. Ruleset on main: require every gate
-# (G1 static, G2 unit, G3 integration, G5 security / secrets, G5 security / dependencies, G5 SAST / semgrep);
+# (G0 hygiene, G1 static, G2 unit, G3 integration, G5 security / secrets, G5 security / dependencies, G5 SAST / semgrep);
 # a job skipped because an earlier gate failed counts as passing, so requiring only the last one is not enough.
 name: self-check
 on:
@@ -16,8 +16,22 @@ permissions:
   contents: read
 
 jobs:
+  hygiene:
+    name: G0 hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The policy's own tests first, then forge's own repository through the same action apps use.
+      - run: |
+          docker run --rm -v "$PWD/policy:/policy:ro" \
+            openpolicyagent/conftest:v0.71.1@sha256:0e77cdf7c1fcde035f3c579e4aaa6664ee2a8be5777eaa9af9f520cdd02280c0 \
+            verify --policy /policy --no-color
+      - uses: ./actions/hygiene
+
   fast:
     name: G1 static
+    needs: hygiene
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -25,7 +39,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: for f in probe/*.mjs stages/*.mjs; do node --check "$f"; done
+      - run: for f in probe/*.mjs stages/*.mjs policy/*.mjs; do node --check "$f"; done
       # Workflow linter (syntax, expressions, shell). Go is preinstalled; the module checksum database pins it.
       - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - run: ~/go/bin/actionlint .github/workflows/*.yml templates/.github/workflows/*.yml
@@ -40,7 +54,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: node --test stages/check.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test stages/check.test.mjs policy/codeowners.test.mjs
 
   integration:
     name: G3 integration

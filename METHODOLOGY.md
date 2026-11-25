@@ -18,9 +18,16 @@ and G10 come with `harness.toml` and `harness doctor`).
 
 ## Gate by gate
 
-### G0 Repository hygiene (planned)
-Ruleset on `main`, CODEOWNERS covering the protected zones, dependencies pinned (actions by SHA, images by
-digest), no secret anywhere in the history (gitleaks on the full history, no baseline). OpenSSF Scorecard, Conftest.
+### G0 Repository hygiene
+`actions/hygiene` (composite action, so it carries its policy files) runs on every PR:
+- Conftest on `harness.toml` (`policy/manifest`): non-empty name, level 1–4, protected zones include `.github/**`,
+  `harness.toml` and `tests/critical/**`, alerts through GitHub issues.
+- Conftest on `.github/workflows/*` (`policy/workflows`): top-level permissions declared, never `write-all`, every
+  action and reusable workflow pinned to a full SHA (images by digest).
+- `policy/codeowners.mjs`: CODEOWNERS owns every protected zone of the manifest, and itself.
+Also part of G0: gitleaks over the full history (`security.yml`, no baseline) and a weekly OpenSSF Scorecard
+(`scorecard.yml`). Planned: comparing the live ruleset with the manifest (`harness doctor`) and refusing a
+lowered ratchet (needs the base branch's manifest).
 
 ### G1 Static
 Format, lint, strict types: your "compiler". Holds the line on existing repos: only new findings block, the
