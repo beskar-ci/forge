@@ -31,7 +31,9 @@ lowered ratchet (needs the base branch's manifest).
 
 ### G1 Static
 Format, lint, strict types: your "compiler". Holds the line on existing repos: only new findings block, the
-existing ones are inventoried in `.harness/baseline.json`, a ratchet that can only go down.
+existing ones are inventoried in `.harness/baseline.json`, a ratchet that can only go down. `ratchet/ratchet.mjs`
+does it for any tool that writes ESLint JSON or SARIF (`check` fails above the baseline; `update` lowers it and
+refuses to raise it). Small debt is better fixed than inventoried: an empty baseline is the goal.
 
 ### G2 Unit
 Pure logic with many branches: money, units and conversions, parsing, permissions, scoring. Table-driven tests
