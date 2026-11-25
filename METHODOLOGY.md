@@ -115,3 +115,11 @@ data loss / integrity 4, resource leaks 3, limit bypass 2. Write tests for the a
   needed: removed, Semgrep still reported 0 findings. Run the scanner before assuming a suppression is required.
 - An editor can turn a `\u202e` escape into the literal invisible character (Trojan Source); Semgrep's bidi rule
   caught it.
+- CODEOWNERS rejects a **secret** team ("Unknown owner"): the team must be visible, which in an organisation means
+  visible to its members only, not to the public. Check `GET /repos/{owner}/{repo}/codeowners/errors` after every
+  change, and only relax approvals once it reports zero errors.
+- With 0 general approvals and code-owner review required, "require approval of the most recent push" would still
+  demand an approval on every PR; "dismiss stale reviews on push" already covers code pushed after an approval.
+- A bot that creates a repository becomes its admin and could edit the ruleset that controls it: downgrade it to
+  write. An agent must never test its own controls by trying to disable them.
+
