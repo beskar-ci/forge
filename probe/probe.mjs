@@ -33,8 +33,15 @@ function forge(headers) {
     /^cookie$/i.test(k) ? v.replace(/=([^;]+)/g, () => '=' + hex()) : /^authorization$/i.test(k) ? v.replace(/\S+$/, hex()) : hex()]));
 }
 
-// Header values written as "$NAME" come from the environment (tokens in CI).
-const creds = (user) => Object.fromEntries(Object.entries(user?.headers ?? {}).map(([k, v]) => [k, v.startsWith('$') ? process.env[v.slice(1)] ?? '' : v]));
+// $NAME or ${NAME} anywhere in a header value comes from the environment (tokens in CI). A missing variable is an
+// error: sending the placeholder would make every authenticated check meaningless.
+function expand(value) {
+  return value.replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (_, name) => {
+    if (process.env[name] === undefined) throw new Error(`probe: environment variable ${name} is not set`);
+    return process.env[name];
+  });
+}
+const creds = (user) => Object.fromEntries(Object.entries(user?.headers ?? {}).map(([k, v]) => [k, expand(v)]));
 
 export async function run(cfg) {
   const results = [];
@@ -71,6 +78,20 @@ export async function run(cfg) {
   for (const r of cfg.routes ?? []) {
     const name = r.name ?? `${r.method ?? 'GET'} ${r.path}`;
     const vars = { id: newId(), fuzz: 'probe' };
+
+    // Control: a valid request with valid credentials must work (on its own resource for owned routes), otherwise
+    // every "refused" below proves nothing (a server refusing everything would pass them). Race routes prove it
+    // themselves (at least one success); `control: false` opts out explicitly, e.g. for a route that must 404.
+    if (!r.race && r.control !== false) {
+      const cv = { id: newId(), fuzz: 'probe' };
+      if (r.owned) {
+        const made = await send(r.owned.create, cv, owner);
+        if (made.status >= 300) { record('ownership: setup', name, false, `create answered ${made.status}`); continue; }
+      }
+      const c = await send(r, cv, owner);
+      record('control: a valid request works', name, c.status < 400, `answered ${c.status}`);
+      if (c.status >= 400) continue;
+    }
 
     let before = null;
     if (r.owned) {
@@ -124,7 +145,7 @@ export async function run(cfg) {
       const { parallel = 20, maxSuccess = 1, freshIds = false } = r.race;
       const all = await Promise.all(Array.from({ length: parallel }, () => send(r, { ...vars, id: freshIds ? newId() : vars.id }, owner)));
       const ok = all.filter(x => x.status < 300).length;
-      record('race', name, ok <= maxSuccess, `${ok} of ${parallel} parallel requests succeeded (max ${maxSuccess})`);
+      record('race', name, ok >= 1 && ok <= maxSuccess, `${ok} of ${parallel} parallel requests succeeded (expected 1 to ${maxSuccess})`);
     }
   }
 

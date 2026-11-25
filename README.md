@@ -78,17 +78,18 @@ Secrets and variables a project may need: `CLAUDE_CODE_OAUTH_TOKEN` (`claude set
 
 | Check | Fails when |
 | --- | --- |
+| Control: a valid request works | a valid request with the owner's credentials (on its own resource for `owned` routes) is refused; the route's other checks are then skipped, since a server refusing everything would pass them. Opt out with `control: false` |
 | Auth: missing or forged credentials | a route marked `auth` answers anything other than 401, 403 or 404 |
 | Ownership: other user | the second user reads the first user's resource (`owned`), or the owner's data changed |
 | Path escape | an encoded `../`, an absolute path, a NUL or a 4 KB identifier is not refused with a 4xx |
 | Hostile input | SQL, HTML or template strings, huge strings or wrong JSON types give a 5xx or are echoed back as is |
 | Size limit | a body over `maxBytes` is not refused with a 4xx |
-| Race | more than `maxSuccess` of N parallel requests succeed |
+| Race | none, or more than `maxSuccess`, of N parallel requests succeed |
 | Security headers | `nosniff`, `Referrer-Policy`, clickjacking protection, HSTS on https are missing |
 | Cookies | a cookie lacks HttpOnly, Secure or SameSite |
 | No server error | a response is a 5xx |
 
-Configuration format: `probe/example.config.json`. Run it against local, a preview or staging, never against production data.
+Configuration format: `probe/example.config.json`. `$NAME` or `${NAME}` anywhere in a header value comes from the environment; a missing variable stops the run. Run it against local, a preview or staging, never against production data.
 
 ### Verified so far
 

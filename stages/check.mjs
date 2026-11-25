@@ -103,14 +103,17 @@ export function inspect(root) {
     { n: 'G8', name: 'Resilience and load (nightly, staging)', items: [
       item('fault injection + load', scheduled && /toxiproxy|chaos|turmoil/i.test(ci + [...deps].join(' ')) && /k6|locust|artillery/i.test(ci), 'nightly Toxiproxy + k6'),
     ] },
-    { n: 'chain', name: 'Chain + production gate (merge → production)', items: [
+    // Heuristics only (no YAML parser here): at best this gate is "manual", never "done". Verify the real job graph
+    // by hand, or with the doctor once it exists.
+    { n: 'chain', name: 'Chain + production gate (merge → production)', manual: true, items: [
       item('gates chained', (ci.match(/\n\s+needs:/g) ?? []).length >= 4, 'each job `needs:` the previous one, so a red gate stops the chain'),
-      item('production only after e2e on main', /environment:\s*['"]?production/.test(prodJob) && /needs:[^\n]*e2e/.test(prodJob),
+      item('production only after e2e on main', /environment:\s*['"]?production/.test(prodJob) && /needs:[^\n]*e2e/.test(prodJob)
+        && /refs\/heads\/main/.test(prodJob) && /event_name\s*==\s*'push'/.test(prodJob),
         'deploy-production job: needs the G6 job, runs on push to main, environment production'),
     ] },
   ];
-  for (const s of stages) s.status = s.items.every(i => i.ok) ? 'done' : s.items.some(i => i.ok) ? 'partial' : 'missing';
-  const next = stages.find(s => s.status !== 'done')?.n ?? null;
+  for (const s of stages) s.status = s.items.every(i => i.ok) ? (s.manual ? 'manual' : 'done') : s.items.some(i => i.ok) ? 'partial' : 'missing';
+  const next = stages.find(s => !['done', 'manual'].includes(s.status))?.n ?? null;
   return { repo: basename(root), languages: Object.keys(lang).filter(k => lang[k]), stages, next };
 }
 
@@ -121,7 +124,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   else {
     console.log(`${report.repo} (${report.languages.join(', ') || 'unknown stack'})\n`);
     for (const s of report.stages) {
-      console.log(`${{ done: '✔', partial: '◐', missing: '✘' }[s.status]} ${s.n} ${s.name}`);
+      console.log(`${{ done: '✔', manual: '?', partial: '◐', missing: '✘' }[s.status]} ${s.n} ${s.name}${s.status === 'manual' ? ' — looks right, verify the job graph by hand' : ''}`);
       for (const i of s.items) console.log(`    ${i.ok ? '✔' : '✘'} ${i.name}${i.ok ? '' : ` — ${i.hint}`}`);
     }
     console.log(`\nNext: ${report.next ?? 'all done'}`);

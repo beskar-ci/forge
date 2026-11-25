@@ -18,12 +18,19 @@ const posix = (p) => p.split('\\').join('/');
 
 // ESLint `-f json`: [{ filePath, messages: [{ ruleId, severity }] }]. Parse errors have no ruleId.
 function fromEslint(report, root) {
+  if (!Array.isArray(report)) throw new Error('not an ESLint JSON report (expected an array of files)');
   return report.flatMap(f => f.messages.map(m => `${posix(relative(root, f.filePath))}::${m.ruleId ?? 'parse-error'}`));
 }
 
 // SARIF 2.1.0: runs[].results[] with ruleId and the first location's URI.
+// A report without runs, or a run whose scanner says it failed, is an error: counting it as zero findings would
+// let a broken scan pass CI, and let update erase recorded debt.
 function fromSarif(report, root) {
-  return (report.runs ?? []).flatMap(run => (run.results ?? []).map(r => {
+  if (!report || !Array.isArray(report.runs)) throw new Error('not a SARIF report (no runs array)');
+  if (report.runs.some(run => (run.invocations ?? []).some(i => i.executionSuccessful === false))) {
+    throw new Error('scanner reported a failed run (executionSuccessful: false)');
+  }
+  return report.runs.flatMap(run => (run.results ?? []).map(r => {
     let uri = r.locations?.[0]?.physicalLocation?.artifactLocation?.uri ?? 'unknown';
     if (uri.startsWith('file://')) uri = relative(root, fileURLToPath(uri));
     return `${posix(uri)}::${r.ruleId ?? r.rule?.id ?? 'unknown'}`;
@@ -107,4 +114,7 @@ function main(argv) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try { process.exitCode = main(process.argv.slice(2)); }
+  catch (e) { console.error(`✘ ratchet: ${e.message}`); process.exitCode = 2; }
+}

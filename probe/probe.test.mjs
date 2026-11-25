@@ -77,3 +77,37 @@ test('passes the fixed server', async () => {
   assert.deepEqual(failing(results), [], JSON.stringify(results.filter(r => !r.ok), null, 2));
   assert.ok(results.length >= 12);
 });
+
+test('an endpoint that refuses every request is not a green report', async () => {
+  const server = http.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => { res.writeHead(401, { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' }); res.end('{}'); });
+  }).listen(0, '127.0.0.1');
+  await new Promise(r => server.once('listening', r));
+  try {
+    const results = await run({
+      baseUrl: `http://127.0.0.1:${server.address().port}`, idFormat: 'hex32',
+      users: { a: { headers: { Authorization: 'Bearer broken' } } },
+      routes: [
+        { name: 'save', method: 'PUT', path: '/items/{id}', auth: true, maxBytes: 100, body: { title: '{fuzz}' } },
+        { name: 'claim', method: 'POST', path: '/claim', race: { parallel: 5, maxSuccess: 1 } },
+      ],
+    });
+    assert.deepEqual(failing(results), ['control: a valid request works', 'race']);
+    assert.ok(!results.some(r => r.route === 'save' && r.check !== 'control: a valid request works'), 'no rejection is credited without a working control request');
+  } finally { server.close(); }
+});
+
+test('credentials: $VAR is expanded anywhere in a header value, and a missing variable is an error', async () => {
+  const seen = [];
+  const server = http.createServer((req, res) => { seen.push(req.headers.cookie); req.resume(); req.on('end', () => { res.writeHead(200); res.end('{}'); }); }).listen(0, '127.0.0.1');
+  await new Promise(r => server.once('listening', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    process.env.PROBE_TEST_TOKEN = 'abc123';
+    await run({ baseUrl: base, users: { a: { headers: { Cookie: 'session=$PROBE_TEST_TOKEN; theme=${PROBE_TEST_TOKEN}' } } }, routes: [{ path: '/ok' }] });
+    assert.ok(seen.includes('session=abc123; theme=abc123'), `cookie sent: ${seen.join(' | ')}`);
+    delete process.env.PROBE_TEST_TOKEN;
+    await assert.rejects(run({ baseUrl: base, users: { a: { headers: { Cookie: 'session=$PROBE_TEST_TOKEN' } } }, routes: [] }), /PROBE_TEST_TOKEN is not set/);
+  } finally { server.close(); }
+});
