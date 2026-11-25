@@ -243,6 +243,8 @@ harness/                              my-app/ (after harness init)
 
 An agent only opens PRs on a repository from level 3: before that, nothing guarantees its tests prove anything.
 
+**Exception: forge itself.** The bot works on this repository from level 1, because every protected zone here (gates, tests, policy, workflows, CODEOWNERS) needs a code owner's approval: the agent can improve the framework but cannot weaken what judges its own PRs.
+
 ---
 
 ## 5. Writing the tests in an app
