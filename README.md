@@ -39,6 +39,7 @@ The repository already covers gates G0 to G6 and G8 as reusable workflows, actio
 | `probe/probe.mjs` | **Code.** Black-box attack on any HTTP API: authentication, another user's data, out-of-bounds paths, hostile input, size limits, races, headers, cookies |
 | `actions/hygiene` | G0 as a composite action: runs the Conftest policy and the CODEOWNERS check against the calling repository |
 | `policy/` | The G0 rules: `manifest/*.rego` (harness.toml), `workflows/*.rego` (pinning, permissions), each with Rego tests, and `codeowners.mjs` (protected zones owned) |
+| `ratchet/ratchet.mjs` | **Code.** Holds the line: counts findings (ESLint JSON or any SARIF) per file and rule against `.harness/baseline.json`; only new ones block, and `update` refuses to raise the baseline |
 | `harness.toml` | forge's own manifest: forge goes through its own G0 |
 | `skills/harden` | Claude Code skill `/harden`: detects the gates in place, implements the next one, proves it in CI |
 | `.github/workflows/` | Reusable CI: `security.yml` (gitleaks + audits), `sast.yml` (Semgrep), `dast.yml` (OWASP ZAP), `claude-review.yml`, and `self.yml`, which puts this repository through its own chain |

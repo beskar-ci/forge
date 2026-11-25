@@ -39,7 +39,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: for f in probe/*.mjs stages/*.mjs policy/*.mjs; do node --check "$f"; done
+      - run: for f in probe/*.mjs stages/*.mjs policy/*.mjs ratchet/*.mjs; do node --check "$f"; done
       # Workflow linter (syntax, expressions, shell). Go is preinstalled; the module checksum database pins it.
       - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - run: ~/go/bin/actionlint .github/workflows/*.yml templates/.github/workflows/*.yml
@@ -55,7 +55,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: node --test stages/check.test.mjs policy/codeowners.test.mjs
+      - run: node --test stages/check.test.mjs policy/codeowners.test.mjs ratchet/ratchet.test.mjs
 
   integration:
     name: G3 integration

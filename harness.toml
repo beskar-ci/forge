@@ -4,7 +4,7 @@ name = "forge"
 level = 1
 
 [zones.protected]   # what judges the code: changes need a gatekeeper (CODEOWNERS)
-paths = [".github/**", "harness.toml", "tests/critical/**", "templates/.github/**", "policy/**", "actions/**", "**/*.test.mjs"]
+paths = [".github/**", "harness.toml", "tests/critical/**", "templates/.github/**", "policy/**", "actions/**", "ratchet/**", "**/*.test.mjs"]
 
 [zones.standard]
 paths = ["**"]

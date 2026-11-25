@@ -7,4 +7,5 @@
 /tests/critical/          @beskar-ci/gatekeepers
 /policy/                  @beskar-ci/gatekeepers
 /actions/                 @beskar-ci/gatekeepers
+/ratchet/                 @beskar-ci/gatekeepers
 *.test.mjs                @beskar-ci/gatekeepers
