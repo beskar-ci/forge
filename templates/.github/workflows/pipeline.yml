@@ -60,12 +60,12 @@ jobs:
   security:
     name: G5 security
     needs: integration
-    uses: beskar-ci/forge/.github/workflows/security.yml@a91616a17b8a943be8734acbccfcd261df46e528 # main
+    uses: beskar-ci/forge/.github/workflows/security.yml@955649ff66b1f2d0dfa029ec86617bf978d2203e # main 2026-11-25
 
   sast:
     name: G5 SAST
     needs: integration
-    uses: beskar-ci/forge/.github/workflows/sast.yml@a91616a17b8a943be8734acbccfcd261df46e528 # main
+    uses: beskar-ci/forge/.github/workflows/sast.yml@955649ff66b1f2d0dfa029ec86617bf978d2203e # main 2026-11-25
 
   review:
     name: G5 review
@@ -76,7 +76,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
-    uses: beskar-ci/forge/.github/workflows/claude-review.yml@a91616a17b8a943be8734acbccfcd261df46e528 # main
+    uses: beskar-ci/forge/.github/workflows/claude-review.yml@955649ff66b1f2d0dfa029ec86617bf978d2203e # main 2026-11-25
     permissions:
       contents: read
       pull-requests: write
