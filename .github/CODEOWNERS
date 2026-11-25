@@ -1,0 +1,5 @@
+# What judges the code needs a human gatekeeper's approval; everything else merges once all gates are green.
+# The team is secret: its members are not visible outside the organisation. The bot is not in it.
+/.github/                 @beskar-ci/gatekeepers
+/templates/.github/       @beskar-ci/gatekeepers
+*.test.mjs                @beskar-ci/gatekeepers
