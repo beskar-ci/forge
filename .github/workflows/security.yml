@@ -1,6 +1,6 @@
-# Reusable: secret scan + dependency audits for whatever ecosystems the caller repo uses.
+# Reusable (G5, and G0's "no secret in the history"): gitleaks over the WHOLE git history, plus dependency audits
+# for whatever ecosystems the caller repo uses.
 # Call with:  uses: beskar-ci/forge/.github/workflows/security.yml@<sha>
-# and grant the job:  permissions: { contents: read, pull-requests: read }
 name: security
 on:
   workflow_call:
@@ -12,18 +12,18 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # On pull requests gitleaks lists the PR's commits through the API.
-    permissions:
-      contents: read
-      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      # False positives go in the caller's .gitleaks.toml (see templates/.gitleaks.toml).
-      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The gitleaks CLI itself (MIT, no licence key; the gitleaks Action needs one for organisation repos),
+      # pinned by digest. Scans every commit, no baseline. False positives: the caller's .gitleaks.toml,
+      # edited by a human only (see templates/.gitleaks.toml). Findings are redacted in the log.
+      - run: |
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+            ghcr.io/gitleaks/gitleaks:v8.30.0@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9 \
+            git /repo --redact --verbose --exit-code 1
 
   dependencies:
     runs-on: ubuntu-latest

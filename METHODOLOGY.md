@@ -108,8 +108,9 @@ data loss / integrity 4, resource leaks 3, limit bypass 2. Write tests for the a
 - Security headers are easy to forget: probe's first run on a real app found no clickjacking protection.
 - GitHub counts a required job that was **skipped** (because an earlier gate failed) as passing: require every
   gate, never only the last one of the chain.
-- gitleaks-action needs `pull-requests: read` on PR events (it lists the PR's commits); a reusable workflow only
-  gets the permissions its caller grants.
+- gitleaks-action needs `pull-requests: read` on PR events, and a licence key as soon as the repo belongs to an
+  organisation; the gitleaks CLI (pinned image) needs neither and scans the whole history. A reusable workflow
+  only gets the permissions its caller grants.
 - Silencing a scanner (`nosemgrep`) to get green is weakening a gate. On this repo the comments were not even
   needed: removed, Semgrep still reported 0 findings. Run the scanner before assuming a suppression is required.
 - An editor can turn a `\u202e` escape into the literal invisible character (Trojan Source); Semgrep's bidi rule

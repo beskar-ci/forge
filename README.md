@@ -66,7 +66,6 @@ Les workflows réutilisables s'appellent ainsi, épinglés sur un SHA de commit 
 ```yaml
 security:
   uses: beskar-ci/forge/.github/workflows/security.yml@<sha>
-  permissions: { contents: read, pull-requests: read }
 ```
 
 Secrets et variables qu'un projet peut demander : `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) pour la revue, `STAGING_URL` pour le DAST et la charge, identifiants de comptes de test pour les tests de contrat.

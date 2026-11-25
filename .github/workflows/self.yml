@@ -59,9 +59,6 @@ jobs:
     name: G5 security
     needs: integration
     uses: ./.github/workflows/security.yml
-    permissions:
-      contents: read
-      pull-requests: read
 
   sast:
     name: G5 SAST
