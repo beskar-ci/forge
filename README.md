@@ -1,172 +1,172 @@
 # forge
 
-**Un framework de production fortifiée, applicable à n'importe quel dépôt, par des humains comme par des agents.**
+**A fortified-production framework for any repository, usable by humans and agents alike.**
 
-Une « prod parfaite » n'existe pas ; ce qui existe, c'est une prod où rien ne passe sans preuve et où tout problème finit en issue. Ce dépôt orchestre des outils standard plutôt que d'en écrire : onze portes bloquantes (G0 à G10), un manifeste par dépôt, une politique commune pour les agents et les alertes, des seuils en cliquet, et quatre niveaux de maturité pour l'adopter sur n'importe quel dépôt sans tout casser.
+A "perfect prod" does not exist; what does exist is a prod where nothing gets in without proof and every problem ends up as an issue. This repository orchestrates standard tools rather than writing new ones: eleven blocking gates (G0 to G10), one manifest per repository, a shared policy for agents and alerts, ratcheted thresholds, and four maturity levels to adopt it on any repository without breaking everything.
 
-- **Ce que contient le dépôt aujourd'hui** : section 1.
-- **Le framework** (architecture, portes, manifeste, politique, rapport) : sections 2 à 4.
-- **Écrire les tests dans une appli** : section 5.
-- **Mise en place sur un dépôt** : section 6.
-- **Pourquoi ces choix** (synthèse de la recherche) : section 7. Le détail des étapes, des outils par écosystème et des leçons tirées : [`METHODOLOGY.md`](METHODOLOGY.md).
+- **What the repository contains today**: section 1.
+- **The framework** (architecture, gates, manifest, policy, report): sections 2 to 4.
+- **Writing the tests in an app**: section 5.
+- **Setting it up on a repository**: section 6.
+- **Why these choices** (research summary): section 7. Details of the gates, tools per ecosystem and lessons learned: [`METHODOLOGY.md`](METHODOLOGY.md).
 
 ---
 
-## 1. Ce que contient le dépôt aujourd'hui
+## 1. What the repository contains today
 
-Le dépôt couvre déjà les portes G1 à G6 et G8 sous forme de workflows réutilisables et de modèles (détail par porte : [`METHODOLOGY.md`](METHODOLOGY.md)). Le reste est planifié.
+The repository already covers gates G1 to G6 and G8 as reusable workflows and templates (details per gate: [`METHODOLOGY.md`](METHODOLOGY.md)). The rest is planned.
 
-| Porte du framework | Où | État |
+| Framework gate | Where | Status |
 | --- | --- | --- |
-| G0 Hygiène du dépôt | — | Prévu (Scorecard, Conftest, rulesets, CODEOWNERS) |
-| G1 Statique | job G1 de `pipeline.yml` | En place |
-| G2 Unitaires | job G2 de `pipeline.yml` | En place |
-| G3 Intégration + autorisations | job G3 de `pipeline.yml`, `probe` | En place (dépôt pilote) |
-| G4 Contrats d'API externes | `nightly.yml` | Modèle, pas encore lancé sur un vrai projet |
-| G5 Sécurité | `security.yml`, `sast.yml`, `claude-review.yml`, `dast.yml`, `probe` | En place (`dast.yml` pas encore lancé sur un vrai projet) |
-| G6 Bout en bout | job G6 de `pipeline.yml` | Modèle, pas encore lancé sur un vrai projet |
-| G7 Mutation | — | Prévu |
-| G8 Résilience et charge | `nightly.yml`, `templates/load/` | Modèles, pas encore lancés sur un vrai projet |
-| G9 Acceptation cachée | — | Prévu |
-| G10 Production | — | Prévu (moniteur externe, heartbeat) |
-| Manifeste, politique, rapport unique | — | Prévu (`harness.toml`, zones, `summary.json`) |
+| G0 Repository hygiene | — | Planned (Scorecard, Conftest, rulesets, CODEOWNERS) |
+| G1 Static | G1 job of `pipeline.yml` | In place |
+| G2 Unit | G2 job of `pipeline.yml` | In place |
+| G3 Integration + authorisation | G3 job of `pipeline.yml`, `probe` | In place (pilot repository) |
+| G4 External API contracts | `nightly.yml` | Template, not yet run on a real project |
+| G5 Security | `security.yml`, `sast.yml`, `claude-review.yml`, `dast.yml`, `probe` | In place (`dast.yml` not yet run on a real project) |
+| G6 End-to-end | G6 job of `pipeline.yml` | Template, not yet run on a real project |
+| G7 Mutation | — | Planned |
+| G8 Resilience and load | `nightly.yml`, `templates/load/` | Templates, not yet run on a real project |
+| G9 Hidden acceptance | — | Planned |
+| G10 Production | — | Planned (external monitor, heartbeat) |
+| Manifest, policy, single report | — | Planned (`harness.toml`, zones, `summary.json`) |
 
-### Contenu
+### Contents
 
-| Chemin | Rôle |
+| Path | Role |
 | --- | --- |
-| `stages/check.mjs` | **Code.** Inspecte n'importe quel dépôt et dit, pour chaque porte (G1 à G6, G8, chaîne), fait / partiel / manquant, puis la suivante. `--json` pour les agents. Première version du futur `harness check` |
-| `probe/probe.mjs` | **Code.** Attaque en boîte noire n'importe quelle API HTTP : authentification, données d'un autre utilisateur, chemins hors limites, entrées hostiles, limites de taille, courses, en-têtes, cookies |
-| `skills/harden` | Skill Claude Code `/harden` : détecte les portes en place, implémente la suivante, la prouve en CI |
-| `.github/workflows/` | CI réutilisable : `security.yml` (gitleaks + audits), `sast.yml` (Semgrep), `dast.yml` (OWASP ZAP), `claude-review.yml`, et `self.yml` qui fait passer ce dépôt par sa propre chaîne |
-| `templates/` | `pipeline.yml` (la chaîne de portes), `nightly.yml` (contrats + DAST + charge, ouvre une issue), `dependabot.yml`, modèle de PR, config gitleaks, règles de revue, test de charge k6 |
+| `stages/check.mjs` | **Code.** Inspects any repository and reports, for each gate (G1 to G6, G8, chain), done / partial / missing, then the next one. `--json` for agents. First version of the future `harness check` |
+| `probe/probe.mjs` | **Code.** Black-box attack on any HTTP API: authentication, another user's data, out-of-bounds paths, hostile input, size limits, races, headers, cookies |
+| `skills/harden` | Claude Code skill `/harden`: detects the gates in place, implements the next one, proves it in CI |
+| `.github/workflows/` | Reusable CI: `security.yml` (gitleaks + audits), `sast.yml` (Semgrep), `dast.yml` (OWASP ZAP), `claude-review.yml`, and `self.yml`, which puts this repository through its own chain |
+| `templates/` | `pipeline.yml` (the chain of gates), `nightly.yml` (contracts + DAST + load, opens an issue), `dependabot.yml`, PR template, gitleaks config, review rules, k6 load test |
 
-Les deux outils de code n'ont aucune dépendance (Node 18 ou plus) et ont leurs propres tests (`node --test probe/probe.test.mjs stages/check.test.mjs`), lancés par la CI de ce dépôt avec ses propres workflows de sécurité et SAST.
+Both code tools have no dependencies (Node 18 or later) and have their own tests (`node --test probe/probe.test.mjs stages/check.test.mjs`), run by this repository's CI together with its own security and SAST workflows.
 
-### L'utiliser
+### Using it
 
-**Avec Claude Code** (une fois par machine) :
+**With Claude Code** (once per machine):
 
 ```
 /plugin marketplace add beskar-ci/forge
 /plugin install forge@forge
 ```
 
-Puis dans n'importe quel projet : `/harden` (ou « amène ce projet au niveau 1 »).
+Then in any project: `/harden` (or "take this project to level 1").
 
-**À la main** :
+**By hand**:
 
 ```sh
-node chemin/vers/forge/stages/check.mjs .            # où en suis-je ?
-node chemin/vers/forge/probe/probe.mjs app.probe.json  # attaquer l'appli qui tourne
+node path/to/forge/stages/check.mjs .            # where am I?
+node path/to/forge/probe/probe.mjs app.probe.json  # attack the running app
 ```
 
-Les workflows réutilisables s'appellent ainsi, épinglés sur un SHA de commit (Dependabot propose les mises à jour) :
+The reusable workflows are called like this, pinned to a commit SHA (Dependabot proposes updates):
 
 ```yaml
 security:
   uses: beskar-ci/forge/.github/workflows/security.yml@<sha>
 ```
 
-Secrets et variables qu'un projet peut demander : `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) pour la revue, `STAGING_URL` pour le DAST et la charge, identifiants de comptes de test pour les tests de contrat.
+Secrets and variables a project may need: `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) for the review, `STAGING_URL` for DAST and load, test-account credentials for contract tests.
 
-### Ce que vérifie `probe`
+### What `probe` checks
 
-| Vérification | Échoue quand |
+| Check | Fails when |
 | --- | --- |
-| Auth : identifiants absents ou falsifiés | une route marquée `auth` répond autre chose que 401, 403 ou 404 |
-| Propriété : autre utilisateur | le second utilisateur lit la ressource du premier (`owned`), ou les données du propriétaire ont changé |
-| Sortie de chemin | un `../` encodé, un chemin absolu, un NUL ou un identifiant de 4 Ko n'est pas refusé en 4xx |
-| Entrée hostile | des chaînes SQL, HTML ou de template, des chaînes énormes ou des types JSON faux donnent un 5xx ou sont renvoyés tels quels |
-| Limite de taille | un corps au-delà de `maxBytes` n'est pas refusé en 4xx |
-| Course | plus de `maxSuccess` requêtes sur N en parallèle réussissent |
-| En-têtes de sécurité | `nosniff`, `Referrer-Policy`, protection contre le clickjacking, HSTS en https manquent |
-| Cookies | un cookie n'a pas HttpOnly, Secure ou SameSite |
-| Aucune erreur serveur | une réponse est en 5xx |
+| Auth: missing or forged credentials | a route marked `auth` answers anything other than 401, 403 or 404 |
+| Ownership: other user | the second user reads the first user's resource (`owned`), or the owner's data changed |
+| Path escape | an encoded `../`, an absolute path, a NUL or a 4 KB identifier is not refused with a 4xx |
+| Hostile input | SQL, HTML or template strings, huge strings or wrong JSON types give a 5xx or are echoed back as is |
+| Size limit | a body over `maxBytes` is not refused with a 4xx |
+| Race | more than `maxSuccess` of N parallel requests succeed |
+| Security headers | `nosniff`, `Referrer-Policy`, clickjacking protection, HSTS on https are missing |
+| Cookies | a cookie lacks HttpOnly, Secure or SameSite |
+| No server error | a response is a 5xx |
 
-Format de configuration : `probe/example.config.json`. À lancer contre le local, une prévisualisation ou staging, jamais contre des données de production.
+Configuration format: `probe/example.config.json`. Run it against local, a preview or staging, never against production data.
 
-### Vérifié jusqu'ici
+### Verified so far
 
-- Les deux outils de code passent leurs tests ; la CI de ce dépôt les lance avec `security.yml` et `sast.yml` sur lui-même.
-- Un dépôt pilote privé utilise `security.yml` et `claude-review.yml` d'ici (CI au vert). `probe` y a fait 17 vérifications passées et un vrai constat (pas de protection contre le clickjacking). `stages/check.mjs` y voit G2 et G3 faites, G1 manquante.
-- **Pas encore lancés sur un vrai projet :** `dast.yml`, les jobs staging/G6/production de `pipeline.yml`, `nightly.yml`, le modèle k6, la revue Claude sur une vraie PR (il faut le jeton).
+- Both code tools pass their tests; this repository's CI runs them together with `security.yml` and `sast.yml` on itself.
+- A private pilot repository uses `security.yml` and `claude-review.yml` from here (CI green). `probe` ran 17 checks there that passed and found one real issue (no clickjacking protection). `stages/check.mjs` sees G2 and G3 done there, G1 missing.
+- **Not yet run on a real project:** `dast.yml`, the staging/G6/production jobs of `pipeline.yml`, `nightly.yml`, the k6 template, the Claude review on a real PR (it needs the token).
 
 ---
 
-## 2. Le framework
+## 2. The framework
 
-Un dépôt « harness » unique, branché sur n'importe quelle appli par un fichier de configuration et un workflow de dix lignes : il orchestre des outils existants, rend chaque porte bloquante, et traite les agents comme des contributeurs qui ne peuvent toucher ni à ce qui les juge ni à ce qui les autorise.
+A single "harness" repository, plugged into any app through one configuration file and a ten-line workflow: it orchestrates existing tools, makes every gate blocking, and treats agents as contributors who can touch neither what judges them nor what authorises them.
 
 ```mermaid
 flowchart LR
-  repo["Dépôt de l'appli<br/>harness.toml : zones, seuils<br/>code et tests<br/>CODEOWNERS, CLAUDE.md"]
-  subgraph core["Cœur du framework"]
+  repo["App repository<br/>harness.toml: zones, thresholds<br/>code and tests<br/>CODEOWNERS, CLAUDE.md"]
+  subgraph core["Framework core"]
     direction TB
-    d["1 Détection<br/>stacks et capacités"] --> g["2 Portes G0 à G10<br/>chacune passe ou bloque"]
-    g --> p["3 Politique<br/>zones, autonomie, cliquets"]
-    p --> r["4 Rapport<br/>JUnit, SARIF, summary.json"]
+    d["1 Detection<br/>stacks and capabilities"] --> g["2 Gates G0 to G10<br/>each one passes or blocks"]
+    g --> p["3 Policy<br/>zones, autonomy, ratchets"]
+    p --> r["4 Report<br/>JUnit, SARIF, summary.json"]
   end
-  ad["Adaptateurs<br/>TypeScript · Rust · Python"]
+  ad["Adapters<br/>TypeScript · Rust · Python"]
   repo --> core
-  core -- appelle --> ad
-  r --> s["Statuts requis<br/>merge bloqué si rouge"]
-  r --> sa["Alertes de code<br/>SARIF vers l'onglet Security"]
-  r --> h["Heartbeat<br/>le run de nuit est vivant"]
-  r --> i["Issues GitHub<br/>immédiat ou résumé"]
-  i --> ag["Agent (Claude Code)<br/>lit l'issue, ouvre une PR<br/>jamais de merge seul"]
-  ag -- "nouvelle PR, mêmes portes,<br/>approbation humaine" --> repo
+  core -- calls --> ad
+  r --> s["Required statuses<br/>merge blocked if red"]
+  r --> sa["Code alerts<br/>SARIF to the Security tab"]
+  r --> h["Heartbeat<br/>the nightly run is alive"]
+  r --> i["GitHub issues<br/>immediate or digest"]
+  i --> ag["Agent (Claude Code)<br/>reads the issue, opens a PR<br/>never merges alone"]
+  ag -- "new PR, same gates,<br/>human approval" --> repo
 ```
 
-L'appli ne déclare que ce que l'outil ne peut pas deviner ; le cœur détecte, exécute les portes via les adaptateurs, applique la politique et publie un seul rapport, d'où partent les statuts, les alertes et les issues qu'un agent peut reprendre, en repassant par les mêmes portes.
+The app only declares what the tool cannot guess; the core detects, runs the gates through the adapters, applies the policy and publishes a single report, from which the statuses, alerts and issues flow, and an agent can pick those issues up, going back through the same gates.
 
-### Six principes
+### Six principles
 
-1. **Orchestrer, ne pas réécrire.** MegaLinter, Scorecard, Semgrep, Stryker, k6 font déjà leur travail ; le framework les câble.
-2. **Une porte bloque ou n'existe pas.** Chaque porte activée est un statut requis dans le ruleset. Un avertissement que personne ne lit n'est pas une porte.
-3. **Tout seuil est un cliquet.** Couverture, score de mutation, budget de latence : ils montent, ne descendent jamais, et seul un humain les modifie.
-4. **Ce qui juge est hors d'atteinte de ce qui est jugé.** Tests critiques, seuils, workflows et CODEOWNERS sont protégés ; les tests d'acceptation cachés ne sont jamais visibles d'un agent.
-5. **Un manifeste par dépôt, une politique pour tous.** L'appli déclare ses zones, son état stable et ses API externes ; les règles d'autonomie et d'alerte vivent dans le cœur.
-6. **On adopte sans tout casser.** Sur un dépôt existant, les portes « tiennent la ligne » : elles bloquent les problèmes nouveaux et inventorient l'existant, à résorber ensuite.
+1. **Orchestrate, don't rewrite.** MegaLinter, Scorecard, Semgrep, Stryker, k6 already do their job; the framework wires them together.
+2. **A gate blocks or does not exist.** Every enabled gate is a required status in the ruleset. A warning nobody reads is not a gate.
+3. **Every threshold is a ratchet.** Coverage, mutation score, latency budget: they go up, never down, and only a human changes them.
+4. **What judges is out of reach of what is judged.** Critical tests, thresholds, workflows and CODEOWNERS are protected; hidden acceptance tests are never visible to an agent.
+5. **One manifest per repository, one policy for all.** The app declares its zones, its steady state and its external APIs; the autonomy and alerting rules live in the core.
+6. **Adopt without breaking everything.** On an existing repository, the gates "hold the line": they block new problems and inventory the existing ones, to be paid down later.
 
-### Les portes
+### The gates
 
-| Porte | Ce qu'elle vérifie | Quand | Outils (TS · Rust · Python) |
+| Gate | What it checks | When | Tools (TS · Rust · Python) |
 | --- | --- | --- | --- |
-| G0 Hygiène du dépôt | Ruleset actif, CODEOWNERS, dépendances épinglées, aucun secret dans le code | Chaque PR + chaque semaine | OpenSSF Scorecard, gitleaks, Conftest |
-| G1 Statique | Format, lint, typage | Avant le commit + chaque PR | MegaLinter ou Trunk ; `tsc` · `clippy` · `mypy` |
-| G2 Unitaires | Logique isolée ; couverture en cliquet | Chaque PR | Vitest · `cargo test` · pytest |
-| G3 Intégration | Vraie base et services en conteneur ; tests de caractérisation | Chaque PR | Testcontainers, CLI Supabase · `sqlx::test` · pytest |
-| G4 Contrats | API externes : réponses enregistrées en PR, vraie API la nuit | Chaque PR + chaque nuit | MSW · `wiremock` · respx ; Pact si on contrôle les deux côtés |
-| G5 Sécurité | Failles du code, dépendances vulnérables, appli déployée attaquée | Chaque PR + staging | Semgrep ou CodeQL en SARIF, Dependabot, `cargo audit`, revue Claude (PR de confiance), OWASP ZAP, `probe` |
-| G6 Bout en bout | Parcours critiques sur l'environnement de prévisualisation | Chaque PR | Playwright |
-| G7 Mutation | Les tests attrapent-ils du code cassé ? Score en cliquet | Incrémental en PR, complet la nuit | Stryker · `cargo-mutants` · mutmut |
-| G8 Résilience et charge | L'état stable tient sous pannes injectées et sous charge | Chaque nuit, sur staging | Toxiproxy, k6 ; `turmoil` pour les services Rust conçus pour |
-| G9 Acceptation cachée | Tests que l'agent n'a jamais vus | PR d'agent uniquement | Dépôt ou étape protégée |
-| G10 Production | Disponibilité, taux d'erreur, tâches planifiées vivantes | En continu | Moniteur externe, alertes sur l'état stable, Healthchecks.io |
+| G0 Repository hygiene | Active ruleset, CODEOWNERS, pinned dependencies, no secret in the code | Every PR + every week | OpenSSF Scorecard, gitleaks, Conftest |
+| G1 Static | Format, lint, types | Before commit + every PR | MegaLinter or Trunk; `tsc` · `clippy` · `mypy` |
+| G2 Unit | Isolated logic; ratcheted coverage | Every PR | Vitest · `cargo test` · pytest |
+| G3 Integration | Real database and services in containers; characterisation tests | Every PR | Testcontainers, Supabase CLI · `sqlx::test` · pytest |
+| G4 Contracts | External APIs: recorded responses on PRs, the real API at night | Every PR + every night | MSW · `wiremock` · respx; Pact if you control both sides |
+| G5 Security | Code flaws, vulnerable dependencies, the deployed app under attack | Every PR + staging | Semgrep or CodeQL as SARIF, Dependabot, `cargo audit`, Claude review (trusted PRs), OWASP ZAP, `probe` |
+| G6 End-to-end | Critical journeys on the preview environment | Every PR | Playwright |
+| G7 Mutation | Do the tests catch broken code? Ratcheted score | Incremental on PRs, full at night | Stryker · `cargo-mutants` · mutmut |
+| G8 Resilience and load | The steady state holds under injected faults and under load | Every night, on staging | Toxiproxy, k6; `turmoil` for Rust services designed for it |
+| G9 Hidden acceptance | Tests the agent has never seen | Agent PRs only | Protected repository or step |
+| G10 Production | Availability, error rate, scheduled jobs alive | Continuously | External monitor, steady-state alerts, Healthchecks.io |
 
 ---
 
-## 3. Le manifeste, seul fichier propre à chaque appli
+## 3. The manifest, the only app-specific file
 
-Tout ce que l'outil peut détecter (langages, base de données, interface web) n'y figure pas. Il ne contient que les décisions humaines.
+Anything the tool can detect (languages, database, web interface) does not go in it. It only holds human decisions.
 
 ```toml
 [project]
 name = "my-app"
-level = 2                      # niveau de maturité visé (section 4)
+level = 2                      # target maturity level (section 4)
 
-[zones.protected]              # diagnostic seulement pour les agents
+[zones.protected]              # diagnosis only for agents
 paths = ["supabase/migrations/**", "lib/auth/**", ".github/**", "tests/critical/**", "harness.toml"]
 
-[zones.standard]               # correction sur PR, merge par un humain
+[zones.standard]               # fix on a PR, merged by a human
 paths = ["**"]
 
-[steady_state]                 # réutilisé par k6, Toxiproxy et les alertes de prod
+[steady_state]                 # reused by k6, Toxiproxy and production alerts
 error_rate_max = 0.01
 latency_p95_ms = 800
 
-[ratchets]                     # valeurs plancher, relevées automatiquement, jamais baissées
+[ratchets]                     # floor values, raised automatically, never lowered
 coverage = 72
 mutation_critical = 61
 
@@ -184,114 +184,114 @@ immediate_label = "alert:immediate"
 digest_label = "alert:digest"
 ```
 
-### La politique, commune à tous les dépôts
+### The policy, shared by every repository
 
-| Zone | Ce que l'agent peut faire | Qui merge |
+| Zone | What the agent may do | Who merges |
 | --- | --- | --- |
-| Protégée (auth, migrations, secrets, harnais, tests critiques, seuils) | Diagnostiquer et proposer un correctif dans l'issue | Toi, après ta propre PR |
-| Standard (code applicatif) | Corriger sur une PR | Toi, après approbation |
-| Faible risque (format, lint, dépendances en version patch) | Corriger sur une PR | Merge automatique si tout est vert, seulement après 20 PR d'agent mergées sans retouche ; retour au niveau standard au premier incident |
+| Protected (auth, migrations, secrets, harness, critical tests, thresholds) | Diagnose and propose a fix in the issue | You, after your own PR |
+| Standard (application code) | Fix it on a PR | You, after approval |
+| Low risk (format, lint, patch-level dependency bumps) | Fix it on a PR | Auto-merge when everything is green, only after 20 agent PRs merged without rework; back to standard at the first incident |
 
-| Événement | Niveau | Canal |
+| Event | Level | Channel |
 | --- | --- | --- |
-| Prod en panne, erreurs au-dessus de l'état stable | Immédiat | Moniteur externe + issue `alert:immediate` |
-| Faille de sécurité confirmée, secret exposé | Immédiat | Issue `alert:immediate` |
-| Test RLS ou migration rouge sur `main` | Immédiat | Issue `alert:immediate` |
-| Run de nuit ou tâche planifiée absent | Immédiat | Healthchecks.io |
-| Agent bloqué après 2 tentatives | Résumé quotidien | Issue `alert:digest` |
-| API externe modifiée (prod intacte) | Résumé quotidien | Issue `alert:digest` |
-| Vulnérabilité moyenne, cliquet en baisse sur une branche | Résumé quotidien | Issue `alert:digest` |
-| Tout le reste | Aucune alerte | Tableau de bord et journaux |
+| Prod down, errors above the steady state | Immediate | External monitor + `alert:immediate` issue |
+| Confirmed security flaw, exposed secret | Immediate | `alert:immediate` issue |
+| RLS test or migration red on `main` | Immediate | `alert:immediate` issue |
+| Nightly run or scheduled job missing | Immediate | Healthchecks.io |
+| Agent stuck after 2 attempts | Daily digest | `alert:digest` issue |
+| External API changed (prod intact) | Daily digest | `alert:digest` issue |
+| Medium vulnerability, ratchet dropping on a branch | Daily digest | `alert:digest` issue |
+| Everything else | No alert | Dashboard and logs |
 
-Pas de mot de passe Gmail dans l'infra : les issues GitHub assignées partent par mail toutes seules. Cette politique est écrite en Rego et vérifiée par Conftest à chaque PR : un `harness.toml` qui retire une zone protégée, baisse un cliquet ou désactive une porte fait échouer G0.
+No email password in the infrastructure: assigned GitHub issues are emailed automatically. This policy is written in Rego and checked by Conftest on every PR: a `harness.toml` that removes a protected zone, lowers a ratchet or disables a gate fails G0.
 
-### Le rapport unique
+### The single report
 
-Chaque porte, quel que soit l'outil, produit l'un de deux formats standard : JUnit XML pour les tests, SARIF pour les constats. Le cœur y ajoute un `summary.json` par exécution (porte, statut, métriques, valeur des cliquets). De là partent un commentaire unique sur la PR, les alertes dans l'onglet Security, et les issues étiquetées. Les agents ne lisent que `summary.json`, jamais la sortie brute des outils.
+Every gate, whatever the tool, produces one of two standard formats: JUnit XML for tests, SARIF for findings. The core adds a `summary.json` per run (gate, status, metrics, ratchet values). From there come a single PR comment, the alerts in the Security tab, and the labelled issues. Agents only read `summary.json`, never the raw tool output.
 
-### Organisation cible du dépôt et de ce qu'il dépose dans une appli
+### Target layout of this repository and of what it puts in an app
 
 ```
-harness/                              mon-app/ (après harness init)
-  .github/workflows/                    .github/workflows/harness.yml   ← appelle harness@<sha>
+harness/                              my-app/ (after harness init)
+  .github/workflows/                    .github/workflows/harness.yml   ← calls harness@<sha>
     gate-static.yml  gate-unit.yml      harness.toml
     gate-integration.yml  …             CODEOWNERS
-    nightly.yml  agent.yml              CLAUDE.md                       ← méthode spec → test → code
-  adapters/typescript|rust|python/      .harness/baseline.json          ← cliquets et existant inventorié
-  policy/*.rego  (+ leurs tests)        tests/critical/                 ← protégés
+    nightly.yml  agent.yml              CLAUDE.md                       ← spec → test → code method
+  adapters/typescript|rust|python/      .harness/baseline.json          ← ratchets and inventoried existing findings
+  policy/*.rego  (+ their tests)        tests/critical/                 ← protected
   templates/  rulesets.json
   cli/   harness init | check | run | doctor
 ```
 
-`harness doctor` compare l'état réel du dépôt GitHub (ruleset, statuts requis, CODEOWNERS, permissions des workflows) à ce que le manifeste exige, et dit ce qui manque. L'actuel `stages/check.mjs` en est la première brique.
+`harness doctor` compares the real state of the GitHub repository (ruleset, required statuses, CODEOWNERS, workflow permissions) with what the manifest requires, and reports what is missing. The current `stages/check.mjs` is its first building block.
 
 ---
 
-## 4. Quatre niveaux de maturité
+## 4. Four maturity levels
 
-| Niveau | Portes actives | Ce qu'il permet |
+| Level | Active gates | What it enables |
 | --- | --- | --- |
-| 1 Socle | G0, G1, G2, G10 + ruleset + heartbeat | Rien de cassé n'entre ; on sait si la prod et les runs de nuit vivent |
-| 2 Intégré | + G3, G4, G5 | Base, API externes et sécurité couvertes ; migration de code possible grâce aux tests de caractérisation |
-| 3 Fortifié | + G6, G7, G8, G9 | Les agents peuvent travailler sur le dépôt |
-| 4 Simulé | + simulation déterministe | Services Rust conçus pour la DST |
+| 1 Foundation | G0, G1, G2, G10 + ruleset + heartbeat | Nothing broken gets in; you know whether prod and the nightly runs are alive |
+| 2 Integrated | + G3, G4, G5 | Database, external APIs and security covered; code migration becomes possible thanks to characterisation tests |
+| 3 Fortified | + G6, G7, G8, G9 | Agents can work on the repository |
+| 4 Simulated | + deterministic simulation | Rust services designed for DST |
 
-Un agent n'ouvre de PR sur un dépôt qu'à partir du niveau 3 : avant, rien ne garantit que ses tests prouvent quelque chose.
+An agent only opens PRs on a repository from level 3: before that, nothing guarantees its tests prove anything.
 
 ---
 
-## 5. Écrire les tests dans une appli
+## 5. Writing the tests in an app
 
-Le framework fournit les portes ; chaque appli écrit ses propres tests, toujours de la même façon, pour que toi comme un agent sachiez exactement où et comment.
+The framework provides the gates; each app writes its own tests, always the same way, so that you and an agent alike know exactly where and how.
 
-### La méthode, pour chaque fonctionnalité
+### The method, for every feature
 
-1. **La spec dans l'issue** : ce que la fonctionnalité doit faire, et ce qu'elle ne doit jamais faire.
-2. **Un test qui échoue**, dont le nom est la règle en une phrase.
-3. **Le code**, jusqu'à ce que le test passe, sans toucher au test.
-4. **La CI** rejoue tout, y compris les anciens tests.
-5. **Chaque bug trouvé en prod** devient d'abord un test qui échoue, puis un correctif.
+1. **The spec in the issue**: what the feature must do, and what it must never do.
+2. **A failing test**, whose name is the rule in one sentence.
+3. **The code**, until the test passes, without touching the test.
+4. **CI** replays everything, including the old tests.
+5. **Every bug found in prod** first becomes a failing test, then a fix.
 
-### Où ranger les tests
+### Where tests go
 
-| Couche | TypeScript | Rust | Python |
+| Layer | TypeScript | Rust | Python |
 | --- | --- | --- | --- |
-| Unitaires | `src/**/*.test.ts`, à côté du code | `mod tests` dans le même fichier | `tests/unit/` |
-| Intégration | `tests/integration/` | `tests/` (dossier du crate) | `tests/integration/` |
-| Critiques, protégés | `tests/critical/` | `tests/critical_*.rs` | `tests/critical/` |
-| Réponses d'API enregistrées | `tests/fixtures/<api>/` | `tests/fixtures/<api>/` | `tests/fixtures/<api>/` |
-| Bout en bout | `e2e/` | — | — |
+| Unit | `src/**/*.test.ts`, next to the code | `mod tests` in the same file | `tests/unit/` |
+| Integration | `tests/integration/` | `tests/` (crate folder) | `tests/integration/` |
+| Critical, protected | `tests/critical/` | `tests/critical_*.rs` | `tests/critical/` |
+| Recorded API responses | `tests/fixtures/<api>/` | `tests/fixtures/<api>/` | `tests/fixtures/<api>/` |
+| End-to-end | `e2e/` | — | — |
 
-### Huit règles pour qu'un test prouve quelque chose
+### Eight rules so that a test proves something
 
-- Un comportement par test, et le nom du test dit lequel.
-- Structure fixe : préparer, agir, vérifier.
-- Déterministe : pas d'heure réelle, pas de hasard sans graine fixe, pas de réseau dans les tests unitaires.
-- Tester le comportement visible, pas l'implémentation : un refactoring ne doit casser aucun test.
-- Ne simuler que les frontières externes (API tierces, e-mail, modèles d'IA) ; jamais son propre code.
-- Chaque test vérifie au moins une valeur précise ; un test sans vérification fait monter la couverture mais pas le score de mutation.
-- Les cas limites d'abord : vide, zéro, négatif, très grand, doublon, accents.
-- Les règles critiques (sécurité des données, argent) ont aussi un test par propriétés.
+- One behaviour per test, and the test's name says which.
+- Fixed structure: arrange, act, assert.
+- Deterministic: no real clock, no randomness without a fixed seed, no network in unit tests.
+- Test visible behaviour, not the implementation: a refactoring must break no test.
+- Only fake the external boundaries (third-party APIs, email, AI models); never your own code.
+- Every test checks at least one precise value; a test without an assertion raises coverage but not the mutation score.
+- Edge cases first: empty, zero, negative, very large, duplicate, accented characters.
+- Critical rules (data safety, money) also get a property-based test.
 
-### Un exemple par couche
+### One example per layer
 
-Unitaire, TypeScript avec Vitest :
+Unit, TypeScript with Vitest:
 
 ```ts
 import { describe, it, expect } from "vitest";
 import { boxesNeeded } from "./boxes";
 
 describe("boxesNeeded", () => {
-  it("arrondit au carton supérieur", () => {
+  it("rounds up to the next box", () => {
     expect(boxesNeeded({ items: 300, boxSize: 250 })).toBe(2);
   });
-  it("renvoie 0 quand il n'y a rien à expédier", () => {
+  it("returns 0 when there is nothing to ship", () => {
     expect(boxesNeeded({ items: 0, boxSize: 250 })).toBe(0);
   });
 });
 ```
 
-Unitaire, Rust :
+Unit, Rust:
 
 ```rust
 #[cfg(test)]
@@ -299,20 +299,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn arrondit_au_carton_superieur() {
+    fn rounds_up_to_the_next_box() {
         assert_eq!(boxes_needed(300, 250), 2);
     }
 }
 ```
 
-Par propriétés, Rust avec `proptest` : la règle est vérifiée sur des centaines de valeurs générées.
+Property-based, Rust with `proptest`: the rule is checked on hundreds of generated values.
 
 ```rust
 use proptest::prelude::*;
 
 proptest! {
     #[test]
-    fn assez_de_cartons_jamais_un_de_trop(items in 0u32..100_000, size in 1u32..5_000) {
+    fn enough_boxes_never_one_too_many(items in 0u32..100_000, size in 1u32..5_000) {
         let n = boxes_needed(items, size);
         prop_assert!(n * size >= items);
         prop_assert!(n == 0 || (n - 1) * size < items);
@@ -320,18 +320,18 @@ proptest! {
 }
 ```
 
-Intégration, Rust avec `sqlx::test` : chaque test reçoit une base neuve, migrations appliquées.
+Integration, Rust with `sqlx::test`: each test gets a fresh database with the migrations applied.
 
 ```rust
 #[sqlx::test]
-async fn un_utilisateur_ne_lit_pas_la_commande_d_un_autre(pool: PgPool) {
+async fn a_user_cannot_read_another_users_order(pool: PgPool) {
     let (alice, bob) = seed_two_users(&pool).await;
     let order = create_order(&pool, alice).await;
     assert!(get_order(&pool, bob, order.id).await.is_err());
 }
 ```
 
-Contrat, TypeScript avec MSW : l'API externe répond avec une réponse enregistrée.
+Contract, TypeScript with MSW: the external API answers with a recorded response.
 
 ```ts
 import { http, HttpResponse } from "msw";
@@ -345,86 +345,86 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 ```
 
-Caractérisation, TypeScript : on fige la sortie actuelle avant de modifier le code.
+Characterisation, TypeScript: freeze the current output before changing the code.
 
 ```ts
-it("la facture calculée ne change pas", () => {
+it("the computed invoice does not change", () => {
   expect(buildInvoice(orderFixture)).toMatchSnapshot();
 });
 ```
 
-Bout en bout, Playwright :
+End-to-end, Playwright:
 
 ```ts
-test("importer un fichier CSV crée des lignes de commande", async ({ page }) => {
+test("importing a CSV file creates order lines", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Fichier").setInputFiles("e2e/fixtures/orders.csv");
-  await page.getByRole("button", { name: "Importer" }).click();
+  await page.getByLabel("File").setInputFiles("e2e/fixtures/orders.csv");
+  await page.getByRole("button", { name: "Import" }).click();
   await expect(page.getByTestId("order-line")).not.toHaveCount(0);
 });
 ```
 
-### Ce que dit `CLAUDE.md` à l'agent
+### What `CLAUDE.md` tells the agent
 
-- Lire la spec de l'issue ; si elle manque ou se contredit, ouvrir `agent:blocked` au lieu de deviner.
-- Écrire d'abord le test qui échoue, au bon endroit selon le tableau ci-dessus.
-- Ne jamais modifier, supprimer ou désactiver un test existant pour faire passer une porte ; si un test semble faux, ouvrir `agent:blocked`.
-- Ne jamais toucher aux zones protégées ni à `harness.toml`.
-- Lancer les portes en local avant d'ouvrir la PR, et joindre `summary.json` à la description.
-
----
-
-## 6. Mise en place sur un dépôt
-
-L'ordre compte : on rend les portes obligatoires avant d'en ajouter, et on n'ouvre le dépôt aux agents qu'en dernier.
-
-**Niveau 1, le premier jour**
-
-- [ ] Rendre le dépôt public, ou passer sur un compte GitHub Pro (rulesets et CODEOWNERS obligatoires sur dépôt privé)
-- [ ] Ajouter le manifeste, le workflow appelant épinglé sur un SHA, CODEOWNERS et `CLAUDE.md`
-- [ ] Remplir les zones protégées du manifeste ; CODEOWNERS couvre `/.github/`, `harness.toml`, `tests/critical/` et lui-même
-- [ ] Ruleset sur `main` : PR obligatoire, statuts G0 à G2 requis, revue des code owners obligatoire, approbation annulée si le code change
-- [ ] Workflows en permissions minimales par défaut (`contents: read`), élargies job par job
-- [ ] Inventorier l'existant dans `.harness/baseline.json` pour tenir la ligne
-- [ ] Moniteur de disponibilité externe sur la prod ; une vérification Healthchecks.io par tâche planifiée
-- [ ] Vérification de conformité du dépôt (`stages/check.mjs`, puis `harness doctor`) au vert
-
-**Niveau 2**
-
-- [ ] Tests de caractérisation sur le code existant qui compte, avant toute refonte
-- [ ] Intégration sur une vraie base en conteneur ; tests de sécurité des données (RLS ou équivalent) dans `tests/critical/`
-- [ ] Réponses enregistrées pour chaque API externe + vérification nocturne contre la vraie API
-- [ ] Semgrep ou CodeQL en SARIF, Dependabot, gitleaks, revue de sécurité Claude sur les PR de confiance, `probe` contre la prévisualisation
-
-**Niveau 3, avant le premier agent**
-
-- [ ] Playwright sur les parcours critiques, contre l'environnement de prévisualisation
-- [ ] Mutation en cliquet sur les zones protégées ; score de départ un peu sous le score actuel
-- [ ] État stable déclaré ; k6 et scénarios Toxiproxy chaque nuit sur staging
-- [ ] Tests d'acceptation cachés dans un dépôt privé séparé, lancés sur les PR d'agent
-- [ ] GitHub App dédiée à l'agent, limitée aux contenus, issues et PR ; ses approbations ne comptent pas
-- [ ] Canal d'escalade dans `CLAUDE.md` : en cas de test qu'il croit faux ou de tâche impossible, l'agent ouvre une issue `agent:blocked` au lieu de toucher au test
-
-**Ensuite, chaque mois**
-
-- [ ] Relever les cliquets atteints
-- [ ] Relire les PR d'agent fusionnées et décider si une catégorie mérite le merge automatique
-- [ ] Restaurer une sauvegarde sur staging, faire un rollback, faire tourner une clé
+- Read the spec in the issue; if it is missing or contradicts itself, open `agent:blocked` instead of guessing.
+- Write the failing test first, in the right place according to the table above.
+- Never modify, delete or disable an existing test to get a gate through; if a test looks wrong, open `agent:blocked`.
+- Never touch the protected zones or `harness.toml`.
+- Run the gates locally before opening the PR, and attach `summary.json` to the description.
 
 ---
 
-## 7. Pourquoi ces choix
+## 6. Setting it up on a repository
 
-Synthèse de la recherche qui fonde le framework (novembre 2026).
+Order matters: make the gates mandatory before adding more, and open the repository to agents last.
 
-**Les outils existants.** [MegaLinter](https://megalinter.io) lance des dizaines de linters dans n'importe quelle CI, avec des « flavors » par type de projet : c'est le modèle des profils par stack. [Trunk Check](https://docs.trunk.io/check/configuration/hold-the-line) ne signale que les problèmes nouveaux d'un changement (*hold-the-line*), le principe qui permet d'adopter le framework sur un dépôt existant. [OpenSSF Scorecard](https://github.com/ossf/scorecard) note la sécurité d'un dépôt (protection de branche, revue, dépendances épinglées, SAST) : c'est déjà la moitié de G0. Le framework orchestre ces outils au lieu de les réécrire.
+**Level 1, on day one**
 
-**L'architecture.** Les [workflows réutilisables](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations) (`on: workflow_call`) laissent chaque appli appeler la chaîne en une ligne ; les épingler par SHA garantit que tout le monde exécute le même code. [SARIF](https://docs.github.com/en/code-security/concepts/code-scanning/sarif-files), standard OASIS lu nativement par GitHub, réunit les constats de tous les outils au même endroit. [Conftest](https://github.com/open-policy-agent/conftest) vérifie des règles écrites en Rego sur n'importe quel fichier de configuration. Les [rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets) rendent les portes obligatoires ; un statut requis peut être exigé d'une GitHub App précise, et une approbation est annulée si le code change. Sur un dépôt privé, rulesets et CODEOWNERS obligatoires demandent GitHub Pro.
+- [ ] Make the repository public, or move to a GitHub Pro account (rulesets and mandatory CODEOWNERS on a private repository)
+- [ ] Add the manifest, the calling workflow pinned to a SHA, CODEOWNERS and `CLAUDE.md`
+- [ ] Fill in the manifest's protected zones; CODEOWNERS covers `/.github/`, `harness.toml`, `tests/critical/` and itself
+- [ ] Ruleset on `main`: PR required, statuses G0 to G2 required, code-owner review required, approval dismissed when the code changes
+- [ ] Workflows with minimal permissions by default (`contents: read`), widened job by job
+- [ ] Inventory the existing findings in `.harness/baseline.json` to hold the line
+- [ ] External uptime monitor on prod; one Healthchecks.io check per scheduled job
+- [ ] Repository compliance check (`stages/check.mjs`, then `harness doctor`) green
 
-**Les tests.** Pour une appli web, le [« trophée » de Kent C. Dodds](https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications) remplace la pyramide : statique, unitaires, une couche d'intégration plus épaisse, peu de bout en bout. Les [tests de caractérisation](https://en.wikipedia.org/wiki/Characterization_test) (Michael Feathers) figent le comportement existant avant une refonte ; ils ne disent pas si le code est juste, seulement s'il a changé. [Pact](https://docs.pact.io/implementation_guides/javascript/docs/consumer) formalise les contrats entre consommateur et fournisseur ; pour une API tierce, on garde l'idée avec des réponses enregistrées et une vérification nocturne. Le score de mutation mesure ce que la couverture ne mesure pas : ce qui est vraiment vérifié. Les seuils se règlent un peu sous le score actuel, ne baissent jamais, et la passe complète tourne la nuit ([Stryker](https://stryker-mutator.io/blog/stryker-0-8-0/), [CircleCI](https://circleci.com/blog/what-is-mutation-testing/)).
+**Level 2**
 
-**La résilience.** La simulation déterministe de FoundationDB ([Will Wilson, Strange Loop 2014](https://thestrangeloop.com/2014/testing-distributed-systems-w-slash-deterministic-simulation.html)) exige un système conçu pour elle dès le départ ([Antithesis](https://antithesis.com/resources/deterministic_simulation_testing/)) : profil optionnel pour les services Rust, pas une porte générale. Pour une appli classique, [Toxiproxy](https://github.com/Shopify/toxiproxy) injecte latence, coupures et resets entre l'appli et ses dépendances. Les [principes du chaos engineering](https://principlesofchaos.org/) disent comment mener ces expériences autour d'un « état stable » mesurable, et les [seuils k6](https://grafana.com/docs/k6/latest/using-k6/thresholds/) font échouer la CI quand cet état n'est pas tenu.
+- [ ] Characterisation tests on the existing code that matters, before any rewrite
+- [ ] Integration on a real database in a container; data-safety tests (RLS or equivalent) in `tests/critical/`
+- [ ] Recorded responses for every external API + nightly check against the real API
+- [ ] Semgrep or CodeQL as SARIF, Dependabot, gitleaks, Claude security review on trusted PRs, `probe` against the preview
 
-**Les agents.** Un agent qui doit faire passer des tests peut les modifier, coder en dur les résultats attendus ou trafiquer le lanceur : le *reward hacking* ([Qodo](https://www.qodo.ai/?p=23012)). Les parades : tests de confiance exécutés hors de sa portée ([source](https://www.vincentschmalbach.com/how-to-stop-a-coding-agent-from-weakening-or-faking-tests-to-make-them-pass/)), tests d'acceptation cachés ([source](https://dev.to/penloom_studio_829b7817d3/your-ai-agent-will-pass-any-test-its-allowed-to-edit-51fo)), CODEOWNERS avec revue obligatoire ([GitHub](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners), [Microsoft Learn](https://learn.microsoft.com/en-gb/training/modules/governance-guardrails-operations/3-enforce-governance-github-controls)), approbations humaines seules, et un canal pour dire « je suis bloqué » : dans une étude de 2026 sur 8 modèles, outil d'escalade et consigne claire ont fait passer la triche de 23,6 % à 5,3 % des tâches ([arXiv](https://arxiv.org/pdf/2608.29460)). La [Claude Code GitHub Action](https://code.claude.com/docs/en/github-actions) gagne à tourner avec une GitHub App aux permissions minimales ; [Claude Code Security Review](https://github.com/anthropics/claude-code-security-review) n'est pas durcie contre l'injection de prompt et ne doit relire que des PR de confiance, en complément de Semgrep ou CodeQL.
+**Level 3, before the first agent**
 
-**Les alertes.** Une alerte qui réveille doit être urgente, importante, actionnable et réelle ([Rob Ewaschuk](https://docs.google.com/document/d/199PqyG3UsyXlwieHaqbGiWVa8eMWi8zzAn0YfcApr8Q/mobilebasic)), porter sur les symptômes et non les causes ([SRE book](https://sre.google/sre-book/monitoring-distributed-systems/)), et se ranger en trois niveaux : agir maintenant, agir plus tard, ne rien faire ([SREcon 2016](https://www.usenix.net/sites/default/files/conference/protected-files/srecon16europe_slides_rabenstein.pdf)). Avec de vrais utilisateurs, on alerte sur le taux de combustion du budget d'erreur, avec une fenêtre longue et une courte ([SRE Workbook](https://sre.google/workbook/alerting-on-slos/)). Un *dead man's switch* détecte la tâche qui ne tourne plus du tout ; Healthchecks.io est open source et gratuit jusqu'à 20 tâches ([comparatif](https://www.productcompass.pm/p/cron-job-monitoring)), avec un délai de grâce réglé tâche par tâche ([openstatus](https://www.openstatus.dev/guides/what-is-a-cron-heartbeat-monitor)).
+- [ ] Playwright on the critical journeys, against the preview environment
+- [ ] Ratcheted mutation on the protected zones; starting score a little below the current score
+- [ ] Steady state declared; k6 and Toxiproxy scenarios every night on staging
+- [ ] Hidden acceptance tests in a separate private repository, run on agent PRs
+- [ ] A GitHub App dedicated to the agent, limited to contents, issues and PRs; its approvals do not count
+- [ ] Escalation channel in `CLAUDE.md`: when it believes a test is wrong or a task is impossible, the agent opens an `agent:blocked` issue instead of touching the test
+
+**Then, every month**
+
+- [ ] Raise the ratchets that were reached
+- [ ] Review the merged agent PRs and decide whether a category deserves auto-merge
+- [ ] Restore a backup on staging, do a rollback, rotate a key
+
+---
+
+## 7. Why these choices
+
+Summary of the research behind the framework (November 2026).
+
+**Existing tools.** [MegaLinter](https://megalinter.io) runs dozens of linters in any CI, with "flavors" per project type: that is the model for per-stack profiles. [Trunk Check](https://docs.trunk.io/check/configuration/hold-the-line) only reports the new problems in a change (*hold-the-line*), the principle that lets you adopt the framework on an existing repository. [OpenSSF Scorecard](https://github.com/ossf/scorecard) scores a repository's security (branch protection, review, pinned dependencies, SAST): that is already half of G0. The framework orchestrates these tools instead of rewriting them.
+
+**Architecture.** [Reusable workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations) (`on: workflow_call`) let each app call the chain in one line; pinning them by SHA guarantees everyone runs the same code. [SARIF](https://docs.github.com/en/code-security/concepts/code-scanning/sarif-files), an OASIS standard read natively by GitHub, brings the findings of every tool into one place. [Conftest](https://github.com/open-policy-agent/conftest) checks rules written in Rego against any configuration file. [Rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets) make the gates mandatory; a required status can be demanded from a specific GitHub App, and an approval is dismissed when the code changes. On a private repository, rulesets and mandatory CODEOWNERS require GitHub Pro.
+
+**Tests.** For a web app, [Kent C. Dodds' "testing trophy"](https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications) replaces the pyramid: static, unit, a thicker integration layer, little end-to-end. [Characterisation tests](https://en.wikipedia.org/wiki/Characterization_test) (Michael Feathers) freeze existing behaviour before a rewrite; they do not say whether the code is right, only whether it changed. [Pact](https://docs.pact.io/implementation_guides/javascript/docs/consumer) formalises contracts between consumer and provider; for a third-party API, keep the idea with recorded responses and a nightly check. The mutation score measures what coverage does not: what is really checked. Thresholds are set a little below the current score, never go down, and the full pass runs at night ([Stryker](https://stryker-mutator.io/blog/stryker-0-8-0/), [CircleCI](https://circleci.com/blog/what-is-mutation-testing/)).
+
+**Resilience.** FoundationDB's deterministic simulation ([Will Wilson, Strange Loop 2014](https://thestrangeloop.com/2014/testing-distributed-systems-w-slash-deterministic-simulation.html)) requires a system designed for it from the start ([Antithesis](https://antithesis.com/resources/deterministic_simulation_testing/)): an optional profile for Rust services, not a general gate. For a regular app, [Toxiproxy](https://github.com/Shopify/toxiproxy) injects latency, cuts and resets between the app and its dependencies. The [principles of chaos engineering](https://principlesofchaos.org/) explain how to run these experiments around a measurable "steady state", and [k6 thresholds](https://grafana.com/docs/k6/latest/using-k6/thresholds/) fail the CI when that state is not held.
+
+**Agents.** An agent that has to make tests pass can modify them, hard-code the expected results or tamper with the runner: *reward hacking* ([Qodo](https://www.qodo.ai/?p=23012)). The counter-measures: trusted tests run out of its reach ([source](https://www.vincentschmalbach.com/how-to-stop-a-coding-agent-from-weakening-or-faking-tests-to-make-them-pass/)), hidden acceptance tests ([source](https://dev.to/penloom_studio_829b7817d3/your-ai-agent-will-pass-any-test-its-allowed-to-edit-51fo)), CODEOWNERS with mandatory review ([GitHub](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners), [Microsoft Learn](https://learn.microsoft.com/en-gb/training/modules/governance-guardrails-operations/3-enforce-governance-github-controls)), human-only approvals, and a channel to say "I am stuck": in a 2026 study of 8 models, an escalation tool and a clear instruction brought cheating down from 23.6% to 5.3% of tasks ([arXiv](https://arxiv.org/pdf/2608.29460)). The [Claude Code GitHub Action](https://code.claude.com/docs/en/github-actions) is best run with a GitHub App with minimal permissions; [Claude Code Security Review](https://github.com/anthropics/claude-code-security-review) is not hardened against prompt injection and should only review trusted PRs, alongside Semgrep or CodeQL.
+
+**Alerts.** An alert that wakes someone up must be urgent, important, actionable and real ([Rob Ewaschuk](https://docs.google.com/document/d/199PqyG3UsyXlwieHaqbGiWVa8eMWi8zzAn0YfcApr8Q/mobilebasic)), be about symptoms rather than causes ([SRE book](https://sre.google/sre-book/monitoring-distributed-systems/)), and fall into three levels: act now, act later, do nothing ([SREcon 2016](https://www.usenix.net/sites/default/files/conference/protected-files/srecon16europe_slides_rabenstein.pdf)). With real users, alert on the error-budget burn rate, with a long and a short window ([SRE Workbook](https://sre.google/workbook/alerting-on-slos/)). A *dead man's switch* detects the job that no longer runs at all; Healthchecks.io is open source and free for up to 20 jobs ([comparison](https://www.productcompass.pm/p/cron-job-monitoring)), with a grace period set job by job ([openstatus](https://www.openstatus.dev/guides/what-is-a-cron-heartbeat-monitor)).
