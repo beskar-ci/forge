@@ -21,7 +21,7 @@ jobs:
 
   dast:
     if: vars.STAGING_URL != ''
-    uses: beskar-ci/forge/.github/workflows/dast.yml@955649ff66b1f2d0dfa029ec86617bf978d2203e # main 2026-11-25
+    uses: beskar-ci/forge/.github/workflows/dast.yml@4f784d231c4f230585d2fa74968adca177ae789a # forge 2026-11-25n 2026-11-25
     with:
       target: ${{ vars.STAGING_URL }}
 

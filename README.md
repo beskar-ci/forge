@@ -42,7 +42,7 @@ The repository already covers gates G0 to G6 and G8 as reusable workflows, actio
 | `ratchet/ratchet.mjs` | **Code.** Holds the line: counts findings (ESLint JSON or any SARIF) per file and rule against `.harness/baseline.json`; only new ones block, and `update` refuses to raise the baseline |
 | `harness.toml` | forge's own manifest: forge goes through its own G0 |
 | `skills/harden` | Claude Code skill `/harden`: detects the gates in place, implements the next one, proves it in CI |
-| `.github/workflows/` | Reusable CI: `security.yml` (gitleaks + audits), `sast.yml` (Semgrep), `dast.yml` (OWASP ZAP), `claude-review.yml`, and `self.yml`, which puts this repository through its own chain |
+| `.github/workflows/` | Reusable CI: `security.yml` (gitleaks + audits for npm, pnpm, Cargo, pip, Go; any other lockfile fails the gate), `sast.yml` (Semgrep), `dast.yml` (OWASP ZAP), `claude-review.yml`, and `self.yml`, which puts this repository through its own chain |
 | `templates/` | `pipeline.yml` (the chain of gates), `nightly.yml` (contracts + DAST + load, opens an issue), `dependabot.yml`, PR template, gitleaks config, review rules, k6 load test |
 
 `stages/` and `probe/` have no dependencies (Node 18 or later); `policy/codeowners.mjs` reads TOML with `smol-toml` (exact version, lockfile committed, audited in CI). Tests: `node --test probe/probe.test.mjs stages/check.test.mjs policy/codeowners.test.mjs` and `conftest verify --policy policy`, all run by this repository's own chain (G0 → G1 → G2 → G3 → G5).
@@ -80,10 +80,10 @@ Secrets and variables a project may need: `CLAUDE_CODE_OAUTH_TOKEN` (`claude set
 | --- | --- |
 | Control: a valid request works | a valid request with the owner's credentials (on its own resource for `owned` routes) is refused; the route's other checks are then skipped, since a server refusing everything would pass them. Opt out with `control: false` |
 | Auth: missing or forged credentials | a route marked `auth` answers anything other than 401, 403 or 404 |
-| Ownership: other user | the second user reads the first user's resource (`owned`), or the owner's data changed |
+| Ownership: other user | the second user's request is not denied (reads always; writes unless the route declares `ownership: "scoped"`, i.e. it acts on the user's own copy), returns the owner's data, or changes it. Needs `owned.read`: without an owner readback nothing is claimed |
 | Path escape | an encoded `../`, an absolute path, a NUL or a 4 KB identifier is not refused with a 4xx |
 | Hostile input | SQL, HTML or template strings, huge strings or wrong JSON types give a 5xx or are echoed back as is |
-| Size limit | a body over `maxBytes` is not refused with a 4xx |
+| Size limit | the valid body, its `{fuzz}` field padded to `maxBytes - 1` bytes, is refused, or padded to `maxBytes + 1` is not refused as too large (413, or `tooLargeStatus`) |
 | Race | none, or more than `maxSuccess`, of N parallel requests succeed |
 | Security headers | `nosniff`, `Referrer-Policy`, clickjacking protection, HSTS on https are missing |
 | Cookies | a cookie lacks HttpOnly, Secure or SameSite |

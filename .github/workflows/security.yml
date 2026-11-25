@@ -44,3 +44,18 @@ jobs:
       # ponytail: requirements.txt only; add uv.lock / poetry.lock when a project needs it.
       - if: hashFiles('requirements.txt') != ''
         run: pipx run pip-audit -r requirements.txt
+      - if: hashFiles('go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - if: hashFiles('go.mod') != ''
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 && "$(go env GOPATH)/bin/govulncheck" ./...
+      # A manifest this workflow cannot audit fails the gate: green must mean "audited", not "nothing recognised".
+      # ponytail: looks at the repository root only; monorepos need one audit per package directory.
+      - name: no unaudited dependency manifests
+        run: |
+          unsupported=""
+          for f in yarn.lock bun.lock bun.lockb poetry.lock uv.lock Pipfile.lock Gemfile.lock composer.lock pom.xml build.gradle build.gradle.kts; do
+            if [ -f "$f" ]; then unsupported="$unsupported $f"; fi
+          done
+          if [ -n "$unsupported" ]; then echo "::error::no audit for:$unsupported (add one to security.yml)"; exit 1; fi
