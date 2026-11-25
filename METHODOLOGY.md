@@ -139,4 +139,11 @@ data loss / integrity 4, resource leaks 3, limit bypass 2. Write tests for the a
   container and service images; the probe example's `session=$TOKEN` was sent literally.
 - A check that passes when nothing works is worse than no check: test the "everything is refused" and "the scan
   failed" cases, not only the hostile ones.
+- Second audit (Codex, 25 Nov 2026): cross-user writes passed the ownership check (writes were never required to be
+  denied, and without an owner readback nothing was compared), a 422 from schema validation passed as a size limit,
+  the template pinned G0 to an older commit than its other workflows (forge's own CI uses the local action, so it
+  could not see it), and a Go-only repository got a green dependency gate with no audit. Fixed with regression tests;
+  `templates/pins.test.mjs` now requires every forge reference in the templates to share one commit, and an
+  unrecognised lockfile fails the dependency gate.
+- "Refused" proves nothing unless the same request, valid, is accepted: test the boundary from both sides.
 

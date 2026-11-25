@@ -2,6 +2,6 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    directories: ["/", "/templates"]   # forge's own workflows and the ones apps copy
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }

@@ -55,7 +55,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: node --test stages/check.test.mjs policy/codeowners.test.mjs ratchet/ratchet.test.mjs
+      - run: node --test stages/check.test.mjs policy/codeowners.test.mjs ratchet/ratchet.test.mjs templates/pins.test.mjs
 
   integration:
     name: G3 integration

@@ -107,14 +107,23 @@ export async function run(cfg) {
       }
     }
 
+    // Ownership needs a successful owner readback before and after, otherwise "unchanged" and "not leaked" are
+    // unproven. Reads and writes must be denied; `ownership: "scoped"` declares that another user's write acts on
+    // their own copy (it may succeed), and then the owner's data must still be identical.
     if (r.owned && otherName) {
-      const res = await send(r, vars, other);
-      const reads = ['GET', 'HEAD'].includes(r.method ?? 'GET');
-      const leaked = res.status < 300 && before && before.text && res.text.includes(before.text);
-      const after = r.owned.read ? await send(r.owned.read, vars, owner) : null;
-      const changed = before && after && after.text !== before.text;
-      const ok = !leaked && !changed && (!reads || DENIED.includes(res.status));
-      record('ownership: other user', name, ok, `other user got ${res.status}${leaked ? ', saw the data' : ''}${changed ? ", owner's data changed" : ''}`);
+      const method = (r.method ?? 'GET').toUpperCase();
+      if (!r.owned.read) record('ownership: other user', name, false, 'owned.read is required to prove the owner\'s data is neither leaked nor changed');
+      else if (before.status >= 300) record('ownership: other user', name, false, `owner readback answered ${before.status}`);
+      else {
+        const res = await send(r, vars, other);
+        const after = await send(r.owned.read, vars, owner);
+        const leaked = res.status < 300 && before.text !== '' && res.text.includes(before.text);
+        const changed = after.status >= 300 || after.text !== before.text;
+        const mustDeny = ['GET', 'HEAD'].includes(method) || r.ownership !== 'scoped';
+        const denied = DENIED.includes(res.status);
+        const ok = !leaked && !changed && (!mustDeny || denied);
+        record('ownership: other user', name, ok, `other user got ${res.status}${mustDeny && !denied ? ' (not denied)' : ''}${leaked ? ', saw the data' : ''}${changed ? ", owner's data changed" : ''}`);
+      }
     }
 
     if (r.path.includes('{id}')) {
@@ -136,9 +145,23 @@ export async function run(cfg) {
       record('hostile input', name, !bad.length, bad.join('; '));
     }
 
+    // Size: the valid body, its "{fuzz}" field padded to exactly limit-1 and limit+1 bytes. Below must be accepted
+    // (so a schema or auth rejection is never mistaken for a limit); above must be refused as too large (413).
     if (r.maxBytes) {
-      const res = await send(r, { id: newId() }, owner, JSON.stringify({ pad: 'x'.repeat(r.maxBytes) }));
-      record('size limit', name, res.status >= 400 && res.status < 500, `${r.maxBytes + 1}+ bytes answered ${res.status}`);
+      const tooLarge = r.tooLargeStatus ?? [413];
+      const sized = (n, v) => {
+        const k = n - Buffer.byteLength(JSON.stringify(fill(r.body, { ...v, fuzz: '' })));
+        return k < 0 ? null : JSON.stringify(fill(r.body, { ...v, fuzz: 'x'.repeat(k) }));
+      };
+      const v = { id: newId() };
+      if (!JSON.stringify(r.body ?? '').includes('"{fuzz}"')) record('size limit', name, false, 'needs a body with a "{fuzz}" string field to pad');
+      else if (sized(r.maxBytes - 1, v) === null) record('size limit', name, false, 'the valid body is already larger than maxBytes');
+      else {
+        const below = await send(r, v, owner, sized(r.maxBytes - 1, v));
+        const above = await send(r, { id: newId() }, owner, sized(r.maxBytes + 1, v));
+        const ok = below.status < 400 && tooLarge.includes(above.status);
+        record('size limit', name, ok, `${r.maxBytes - 1} bytes → ${below.status}, ${r.maxBytes + 1} bytes → ${above.status} (expected < 400, then ${tooLarge.join('/')})`);
+      }
     }
 
     if (r.race) {

@@ -111,3 +111,68 @@ test('credentials: $VAR is expanded anywhere in a header value, and a missing va
     await assert.rejects(run({ baseUrl: base, users: { a: { headers: { Cookie: 'session=$PROBE_TEST_TOKEN' } } }, routes: [] }), /PROBE_TEST_TOKEN is not set/);
   } finally { server.close(); }
 });
+
+// A tiny API for the ownership and size regressions: per-user items, an export endpoint that leaks to anyone, no
+// size limit unless `limit` is set, and a schema that requires a string title.
+function api({ limit = Infinity, scopedWrites = false } = {}) {
+  const items = new Map();
+  return http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', c => { raw += c; });
+    req.on('end', () => {
+      const send = (status, body = {}) => { res.writeHead(status, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' }); res.end(JSON.stringify(body)); };
+      const user = { 'Bearer a': 'a', 'Bearer b': 'b' }[req.headers.authorization];
+      if (!user) return send(401);
+      const [, kind, id] = new URL(req.url, 'http://x').pathname.split('/');
+      if (kind === 'export') return send(200, items.get(`a/${id}`) ?? {});            // leaks the owner's item to anyone
+      if (kind !== 'items') return send(404);
+      if (raw.length > limit) return send(413);
+      const key = scopedWrites ? `${user}/${id}` : `a/${id}`;                          // unscoped: everyone writes a's item
+      if (req.method === 'GET') return items.has(`${user}/${id}`) ? send(200, items.get(`${user}/${id}`)) : send(404);
+      let doc;
+      try { doc = JSON.parse(raw); } catch { return send(422); }
+      if (typeof doc?.title !== 'string') return send(422);
+      items.set(key, doc);
+      return send(200, doc);
+    });
+  });
+}
+
+async function against(server, routes) {
+  server.listen(0, '127.0.0.1');
+  await new Promise(r => server.once('listening', r));
+  try {
+    return await run({ baseUrl: `http://127.0.0.1:${server.address().port}`, idFormat: 'hex32',
+      users: { a: { headers: { Authorization: 'Bearer a' } }, b: { headers: { Authorization: 'Bearer b' } } }, routes });
+  } finally { server.close(); }
+}
+const owned = { create: { method: 'PUT', path: '/items/{id}', body: { title: 'owner secret' } }, read: { method: 'GET', path: '/items/{id}' } };
+const check = (results, name) => results.find(r => r.check === name);
+
+test('ownership: a cross-user write that leaks or changes the owner\'s data fails', async () => {
+  const leak = await against(api(), [{ name: 'export', method: 'POST', path: '/export/{id}', owned }]);
+  assert.equal(check(leak, 'ownership: other user').ok, false, 'POST export returning the owner\'s secret');
+  const overwrite = await against(api(), [{ name: 'save', method: 'PUT', path: '/items/{id}', body: { title: 'other' }, owned }]);
+  assert.equal(check(overwrite, 'ownership: other user').ok, false, 'PUT overwriting the owner\'s item');
+});
+
+test('ownership: writes must be denied unless declared scoped, and scoped writes must leave the owner unchanged', async () => {
+  const route = { name: 'save', method: 'PUT', path: '/items/{id}', body: { title: 'other' }, owned };
+  assert.equal(check(await against(api({ scopedWrites: true }), [route]), 'ownership: other user').ok, false, 'a 200 is not a denial by default');
+  assert.equal(check(await against(api({ scopedWrites: true }), [{ ...route, ownership: 'scoped' }]), 'ownership: other user').ok, true, 'scoped: own copy, owner untouched');
+  assert.equal(check(await against(api(), [{ ...route, ownership: 'scoped' }]), 'ownership: other user').ok, false, 'scoped is no excuse for changing the owner');
+});
+
+test('ownership: without an owner readback nothing is claimed', async () => {
+  const results = await against(api({ scopedWrites: true }), [{ name: 'save', method: 'PUT', path: '/items/{id}', body: { title: 'x' }, ownership: 'scoped', owned: { create: owned.create } }]);
+  assert.equal(check(results, 'ownership: other user').ok, false);
+  assert.match(check(results, 'ownership: other user').detail, /owned\.read is required/);
+});
+
+test('size limit: a schema rejection is not a size limit; limit-1 must pass and limit+1 must be 413', async () => {
+  const route = { name: 'save', method: 'PUT', path: '/items/{id}', body: { title: '{fuzz}' }, maxBytes: 1000 };
+  assert.equal(check(await against(api(), [route]), 'size limit').ok, false, 'no limit at all (a 422 used to pass)');
+  assert.equal(check(await against(api({ limit: 1000 }), [route]), 'size limit').ok, true, 'limit enforced at the boundary');
+  assert.equal(check(await against(api({ limit: 500 }), [route]), 'size limit').ok, false, 'limit lower than declared rejects valid bodies');
+  assert.match(check(await against(api(), [{ ...route, body: { title: 'fixed' } }]), 'size limit').detail, /\{fuzz\}/, 'needs a field to pad');
+});
