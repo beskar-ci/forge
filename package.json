@@ -1,0 +1,9 @@
+{
+  "name": "forge",
+  "private": true,
+  "type": "module",
+  "description": "Only policy/codeowners.mjs uses a dependency; stages/ and probe/ stay dependency-free.",
+  "dependencies": {
+    "smol-toml": "1.9.1"
+  }
+}

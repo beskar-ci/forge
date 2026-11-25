@@ -1,10 +1,10 @@
 # The chain every change goes through (README section 2, gates G1-G6):
 #
-#   commit → PR → [G1 static] → [G2 unit] → [G3 integration] → [G5 security]
+#   commit → PR → [G0 hygiene] → [G1 static] → [G2 unit] → [G3 integration] → [G5 security]
 #        → staging deploy → [G6 end-to-end] → merge → (same chain on main) → production deploy
 #
 # Each job needs the previous one, so a red gate stops the chain.
-# Ruleset on main: require EVERY gate as a status check (G1 static, G2 unit, G3 integration, G5 security / secrets,
+# Ruleset on main: require EVERY gate as a status check (G0 hygiene, G1 static, G2 unit, G3 integration, G5 security / secrets,
 # G5 security / dependencies, G5 SAST / semgrep, G6 e2e). Never require only the last one: GitHub counts a job
 # skipped because an earlier gate failed as passing. G5 review is not required (it is skipped on untrusted PRs).
 # Harness workflows are pinned to a commit SHA; Dependabot (github-actions ecosystem) proposes updates.
@@ -21,8 +21,18 @@ permissions:
   contents: read
 
 jobs:
+  hygiene:
+    name: G0 hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # harness.toml policy, pinned actions, least-privilege permissions, CODEOWNERS owning the protected zones.
+      - uses: beskar-ci/forge/actions/hygiene@FORGE_PIN # main
+
   fast:
     name: G1 static
+    needs: hygiene
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

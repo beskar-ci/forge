@@ -1,0 +1,15 @@
+# forge's own manifest: forge goes through its own G0.
+[project]
+name = "forge"
+level = 1
+
+[zones.protected]   # what judges the code: changes need a gatekeeper (CODEOWNERS)
+paths = [".github/**", "harness.toml", "tests/critical/**", "templates/.github/**", "policy/**", "actions/**", "**/*.test.mjs"]
+
+[zones.standard]
+paths = ["**"]
+
+[alerts]
+channel = "github-issues"
+immediate_label = "alert:immediate"
+digest_label = "alert:digest"

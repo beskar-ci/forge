@@ -1,0 +1,26 @@
+# G0 repository hygiene, as a composite action so it carries its own policy files.
+# In an app:  - uses: actions/checkout@<sha>
+#             - uses: beskar-ci/forge/actions/hygiene@<sha>
+name: forge G0 hygiene
+description: harness.toml policy, workflow pinning and permissions, CODEOWNERS owning every protected zone.
+runs:
+  using: composite
+  steps:
+    - name: manifest and workflow policy (Conftest)
+      shell: bash
+      env:
+        FORGE: ${{ github.action_path }}/../..
+      run: |
+        conftest() {
+          docker run --rm -v "$GITHUB_WORKSPACE:/project:ro" -v "$FORGE/policy:/policy:ro" -w /project \
+            openpolicyagent/conftest:v0.71.1@sha256:0e77cdf7c1fcde035f3c579e4aaa6664ee2a8be5777eaa9af9f520cdd02280c0 "$@"
+        }
+        conftest test harness.toml --policy /policy --namespace manifest --no-color
+        conftest test .github/workflows --policy /policy --namespace workflows --no-color
+    - name: CODEOWNERS owns every protected zone
+      shell: bash
+      env:
+        FORGE: ${{ github.action_path }}/../..
+      run: |
+        npm ci --prefix "$FORGE" --omit=dev --ignore-scripts --no-audit --no-fund --silent
+        node "$FORGE/policy/codeowners.mjs" "$GITHUB_WORKSPACE"

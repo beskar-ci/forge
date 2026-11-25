@@ -1,0 +1,15 @@
+# Level-1 manifest: only the human decisions (README section 3). Checked by G0 on every PR.
+[project]
+name = "my-app"
+level = 1                      # target maturity level (README section 4)
+
+[zones.protected]              # diagnosis only for agents; CODEOWNERS must own each of these
+paths = [".github/**", "harness.toml", "tests/critical/**"]   # add: migrations, auth, secrets handling…
+
+[zones.standard]               # agents fix on a PR
+paths = ["**"]
+
+[alerts]
+channel = "github-issues"
+immediate_label = "alert:immediate"
+digest_label = "alert:digest"

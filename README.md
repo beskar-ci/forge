@@ -14,11 +14,11 @@ A "perfect prod" does not exist; what does exist is a prod where nothing gets in
 
 ## 1. What the repository contains today
 
-The repository already covers gates G1 to G6 and G8 as reusable workflows and templates (details per gate: [`METHODOLOGY.md`](METHODOLOGY.md)). The rest is planned.
+The repository already covers gates G0 to G6 and G8 as reusable workflows, actions and templates (details per gate: [`METHODOLOGY.md`](METHODOLOGY.md)). The rest is planned.
 
 | Framework gate | Where | Status |
 | --- | --- | --- |
-| G0 Repository hygiene | — | Planned (Scorecard, Conftest, rulesets, CODEOWNERS) |
+| G0 Repository hygiene | `actions/hygiene`, `policy/`, `scorecard.yml` | In place: Conftest policy on `harness.toml` and workflows (pinned actions, least privilege), CODEOWNERS owning every protected zone, weekly Scorecard. Checking the live ruleset comes with `harness doctor` |
 | G1 Static | G1 job of `pipeline.yml` | In place |
 | G2 Unit | G2 job of `pipeline.yml` | In place |
 | G3 Integration + authorisation | G3 job of `pipeline.yml`, `probe` | In place (pilot repository) |
@@ -29,7 +29,7 @@ The repository already covers gates G1 to G6 and G8 as reusable workflows and te
 | G8 Resilience and load | `nightly.yml`, `templates/load/` | Templates, not yet run on a real project |
 | G9 Hidden acceptance | — | Planned |
 | G10 Production | — | Planned (external monitor, heartbeat) |
-| Manifest, policy, single report | — | Planned (`harness.toml`, zones, `summary.json`) |
+| Manifest, policy, single report | `harness.toml`, `templates/harness.toml` | Manifest validated by G0; `summary.json` and the single report planned |
 
 ### Contents
 
@@ -37,11 +37,14 @@ The repository already covers gates G1 to G6 and G8 as reusable workflows and te
 | --- | --- |
 | `stages/check.mjs` | **Code.** Inspects any repository and reports, for each gate (G1 to G6, G8, chain), done / partial / missing, then the next one. `--json` for agents. First version of the future `harness check` |
 | `probe/probe.mjs` | **Code.** Black-box attack on any HTTP API: authentication, another user's data, out-of-bounds paths, hostile input, size limits, races, headers, cookies |
+| `actions/hygiene` | G0 as a composite action: runs the Conftest policy and the CODEOWNERS check against the calling repository |
+| `policy/` | The G0 rules: `manifest/*.rego` (harness.toml), `workflows/*.rego` (pinning, permissions), each with Rego tests, and `codeowners.mjs` (protected zones owned) |
+| `harness.toml` | forge's own manifest: forge goes through its own G0 |
 | `skills/harden` | Claude Code skill `/harden`: detects the gates in place, implements the next one, proves it in CI |
 | `.github/workflows/` | Reusable CI: `security.yml` (gitleaks + audits), `sast.yml` (Semgrep), `dast.yml` (OWASP ZAP), `claude-review.yml`, and `self.yml`, which puts this repository through its own chain |
 | `templates/` | `pipeline.yml` (the chain of gates), `nightly.yml` (contracts + DAST + load, opens an issue), `dependabot.yml`, PR template, gitleaks config, review rules, k6 load test |
 
-Both code tools have no dependencies (Node 18 or later) and have their own tests (`node --test probe/probe.test.mjs stages/check.test.mjs`), run by this repository's CI together with its own security and SAST workflows.
+`stages/` and `probe/` have no dependencies (Node 18 or later); `policy/codeowners.mjs` reads TOML with `smol-toml` (exact version, lockfile committed, audited in CI). Tests: `node --test probe/probe.test.mjs stages/check.test.mjs policy/codeowners.test.mjs` and `conftest verify --policy policy`, all run by this repository's own chain (G0 → G1 → G2 → G3 → G5).
 
 ### Using it
 
