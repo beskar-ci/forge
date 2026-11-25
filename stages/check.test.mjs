@@ -73,8 +73,8 @@ test('an unfilled pipeline template does not count as gates', () => inRepo({
 test('the filled pipeline + nightly templates pass every gate', () => inRepo({
   ...app, '.github/workflows/pipeline.yml': filled, '.github/workflows/nightly.yml': nightly,
 }, (r) => {
-  assert.deepEqual(status(r), { G1: 'done', G2: 'done', G3: 'done', G4: 'done', G5: 'done', G6: 'done', G8: 'done', chain: 'done' });
-  assert.equal(r.next, null);
+  assert.deepEqual(status(r), { G1: 'done', G2: 'done', G3: 'done', G4: 'done', G5: 'done', G6: 'done', G8: 'done', chain: 'manual' });
+  assert.equal(r.next, null, 'a gate that needs manual verification is not the next one to build');
 }));
 
 test('parallel jobs, or production without e2e, fail the chain gate', () => inRepo({
@@ -85,3 +85,19 @@ test('parallel jobs, or production without e2e, fail the chain gate', () => inRe
   assert.equal(prod.status, 'missing');
   assert.deepEqual(prod.items.map(i => i.ok), [false, false]);
 }));
+
+test('a disconnected lint job and production deployed from pull requests never look like a safe chain', () => inRepo({
+  ...app,
+  '.github/workflows/ci.yml': [
+    'on: [push, pull_request]', 'jobs:',
+    '  lint:', '    steps:', '      - run: npx eslint .',
+    '  a:', '    needs: x', '  b:', '    needs: a', '  c:', '    needs: b', '  e2e:', '    needs: c',
+    '  deploy-production:', '    needs: e2e', '    if: github.event_name == \'pull_request\'', '    environment: production', '    steps:', '      - run: npx vercel deploy --prod',
+  ].join('\n') + '\n',
+}, (r) => {
+  const chain = r.stages.find(s => s.n === 'chain');
+  assert.notEqual(chain.status, 'done');
+  assert.notEqual(chain.status, 'manual');
+  assert.equal(chain.items.find(i => i.name.startsWith('production only')).ok, false);
+}));
+

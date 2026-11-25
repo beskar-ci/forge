@@ -131,4 +131,12 @@ data loss / integrity 4, resource leaks 3, limit bypass 2. Write tests for the a
   demand an approval on every PR; "dismiss stale reviews on push" already covers code pushed after an approval.
 - A bot that creates a repository becomes its admin and could edit the ruleset that controls it: downgrade it to
   write. An agent must never test its own controls by trying to disable them.
+- An external audit (Codex, 25 Nov 2026) found six false passes; each now has a regression test that failed first:
+  a probe that refuses every request was green (a 401 is a 4xx, zero successes is "under the race cap"), so each
+  route now needs a working control request; an empty or failed SARIF report counted as zero findings (and update
+  could erase debt), so the ratchet rejects it; the staging lock ended before the browser tests, so deploy and e2e
+  now share one job; the checker could call an unsafe chain "done", so it now says "manual" at best; G0 ignored
+  container and service images; the probe example's `session=$TOKEN` was sent literally.
+- A check that passes when nothing works is worse than no check: test the "everything is refused" and "the scan
+  failed" cases, not only the hostile ones.
 

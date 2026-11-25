@@ -51,3 +51,23 @@ test_run_steps_and_plain_jobs_are_not_flagged if {
 	count(deny) == 0 with input as w
 }
 
+digest := "alpine:3@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+test_container_image_needs_a_digest_in_both_syntaxes if {
+	as_string := object.union(good, {"jobs": {"build": {"container": "attacker/image:latest"}}})
+	as_object := object.union(good, {"jobs": {"build": {"container": {"image": "attacker/image:latest", "options": "--cpus 1"}}}})
+	"job build: container image \"attacker/image:latest\" must be pinned by digest (@sha256:...)" in deny with input as as_string
+	"job build: container image \"attacker/image:latest\" must be pinned by digest (@sha256:...)" in deny with input as as_object
+}
+
+test_service_image_needs_a_digest if {
+	w := object.union(good, {"jobs": {"build": {"services": {"db": {"image": "postgres:16"}, "cache": "redis:7"}}}})
+	"job build: service db image \"postgres:16\" must be pinned by digest (@sha256:...)" in deny with input as w
+	"job build: service cache image \"redis:7\" must be pinned by digest (@sha256:...)" in deny with input as w
+}
+
+test_digest_pinned_containers_and_services_pass if {
+	w := object.union(good, {"jobs": {"build": {"container": {"image": digest}, "services": {"db": {"image": digest}, "cache": digest}}}})
+	count(deny) == 0 with input as w
+}
+

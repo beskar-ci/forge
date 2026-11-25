@@ -29,6 +29,15 @@ test('SARIF results are counted per file and rule (relative or file:// URIs)', (
   assert.deepEqual(findings(report, 'sarif', root), { 'src/a.rs::r1': 2, 'unknown::r2': 1 });
 });
 
+test('a report that is not a successful scan is an error, never zero findings', () => {
+  assert.throws(() => findings({}, 'sarif', root), /not a SARIF report/);
+  assert.throws(() => findings({ runs: 'x' }, 'sarif', root), /not a SARIF report/);
+  assert.throws(() => findings({ runs: [{ invocations: [{ executionSuccessful: false }], results: [] }] }, 'sarif', root), /scanner reported a failed run/);
+  assert.throws(() => findings({}, 'eslint-json', root), /not an ESLint JSON report/);
+  assert.deepEqual(findings({ runs: [{ invocations: [{ executionSuccessful: true }], results: [] }] }, 'sarif', root), {}, 'a successful clean scan is zero');
+  assert.deepEqual(findings([], 'eslint-json', root), {}, 'ESLint with no files is zero');
+});
+
 test('an unknown format is an error, not an empty pass', () => {
   assert.throws(() => findings([], 'xml', root), /unknown format/);
 });
