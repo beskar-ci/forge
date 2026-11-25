@@ -117,8 +117,8 @@ flowchart LR
   r --> sa["Code alerts<br/>SARIF to the Security tab"]
   r --> h["Heartbeat<br/>the nightly run is alive"]
   r --> i["GitHub issues<br/>immediate or digest"]
-  i --> ag["Agent (Claude Code)<br/>reads the issue, opens a PR<br/>never merges alone"]
-  ag -- "new PR, same gates,<br/>human approval" --> repo
+  i --> ag["Agent (Claude Code)<br/>reads the issue, opens a PR<br/>merges only when every gate is green"]
+  ag -- "new PR, same gates;<br/>code-owner approval on protected zones" --> repo
 ```
 
 The app only declares what the tool cannot guess; the core detects, runs the gates through the adapters, applies the policy and publishes a single report, from which the statuses, alerts and issues flow, and an agent can pick those issues up, going back through the same gates.
@@ -162,7 +162,7 @@ level = 2                      # target maturity level (section 4)
 [zones.protected]              # diagnosis only for agents
 paths = ["supabase/migrations/**", "lib/auth/**", ".github/**", "tests/critical/**", "harness.toml"]
 
-[zones.standard]               # fix on a PR, merged by a human
+[zones.standard]               # fix on a PR, merged by the bot once every gate is green
 paths = ["**"]
 
 [steady_state]                 # reused by k6, Toxiproxy and production alerts
@@ -191,9 +191,11 @@ digest_label = "alert:digest"
 
 | Zone | What the agent may do | Who merges |
 | --- | --- | --- |
-| Protected (auth, migrations, secrets, harness, critical tests, thresholds) | Diagnose and propose a fix in the issue | You, after your own PR |
-| Standard (application code) | Fix it on a PR | You, after approval |
-| Low risk (format, lint, patch-level dependency bumps) | Fix it on a PR | Auto-merge when everything is green, only after 20 agent PRs merged without rework; back to standard at the first incident |
+| Protected (auth, migrations, secrets, harness, gates, critical tests, thresholds) | Diagnose; propose the fix on a PR | The bot, only after a code owner (a human gatekeeper) approves: CODEOWNERS owns every protected path, and an approval is dismissed if code is pushed afterwards |
+| Standard (everything else) | Fix it on a PR | The bot, as soon as every required gate is green, with no human approval |
+| Rules (ruleset, permissions, secrets, visibility) | Nothing: the bot has write access, not admin | A human, explicitly, every time |
+
+The gates are the proof: a green standard PR merges on its own. What judges the code (workflows, tests, policy, CODEOWNERS) can never be changed by the bot alone, so it cannot weaken a gate to get a PR through. Merges are done by the bot's account, so the history does not carry the reviewer's name.
 
 | Event | Level | Channel |
 | --- | --- | --- |
@@ -411,7 +413,7 @@ Order matters: make the gates mandatory before adding more, and open the reposit
 **Then, every month**
 
 - [ ] Raise the ratchets that were reached
-- [ ] Review the merged agent PRs and decide whether a category deserves auto-merge
+- [ ] Review the PRs the bot merged alone; if one should have needed a human, add its path to the protected zones and CODEOWNERS
 - [ ] Restore a backup on staging, do a rollback, rotate a key
 
 ---
