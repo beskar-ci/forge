@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # harness.toml policy, pinned actions, least-privilege permissions, CODEOWNERS owning the protected zones.
-      - uses: beskar-ci/forge/actions/hygiene@FORGE_PIN # main
+      - uses: beskar-ci/forge/actions/hygiene@fce7cf404b43c23ebcff87c85dc9447f91fea1b8 # G0 commit
 
   fast:
     name: G1 static
