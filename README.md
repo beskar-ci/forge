@@ -80,10 +80,10 @@ Secrets and variables a project may need: `CLAUDE_CODE_OAUTH_TOKEN` (`claude set
 | --- | --- |
 | Control: a valid request works | a valid request with the owner's credentials (on its own resource for `owned` routes) is refused; the route's other checks are then skipped, since a server refusing everything would pass them. Opt out with `control: false` |
 | Auth: missing or forged credentials | a route marked `auth` answers anything other than 401, 403 or 404 |
-| Ownership: other user | the second user's request is not denied (reads always; writes unless the route declares `ownership: "scoped"`, i.e. it acts on the user's own copy), returns the owner's data, or changes it. Needs `owned.read`: without an owner readback nothing is claimed |
+| Ownership: other user | the second user's request is not denied (reads always; writes unless the route declares `ownership: "scoped"`, i.e. it acts on the user's own copy), returns the owner's data, or changes it. Needs `owned.read` and two users (owner first): otherwise nothing is claimed, and a config with `owned` routes but one user is refused |
 | Path escape | an encoded `../`, an absolute path, a NUL or a 4 KB identifier is not refused with a 4xx |
 | Hostile input | SQL, HTML or template strings, huge strings or wrong JSON types give a 5xx or are echoed back as is |
-| Size limit | the valid body, its `{fuzz}` field padded to `maxBytes - 1` bytes, is refused, or padded to `maxBytes + 1` is not refused as too large (413, or `tooLargeStatus`) |
+| Size limit | the valid body, its single `{fuzz}` field padded to `maxBytes - 1` bytes, is refused, or padded to `maxBytes + 1` is not refused as too large (413, or `tooLargeStatus`) |
 | Race | none, or more than `maxSuccess`, of N parallel requests succeed |
 | Security headers | `nosniff`, `Referrer-Policy`, clickjacking protection, HSTS on https are missing |
 | Cookies | a cookie lacks HttpOnly, Secure or SameSite |

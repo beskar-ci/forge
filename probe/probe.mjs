@@ -44,6 +44,10 @@ function expand(value) {
 const creds = (user) => Object.fromEntries(Object.entries(user?.headers ?? {}).map(([k, v]) => [k, expand(v)]));
 
 export async function run(cfg) {
+  // An ownership check needs someone other than the owner: without a second user it would silently not happen.
+  if ((cfg.routes ?? []).some(r => r.owned) && Object.keys(cfg.users ?? {}).length < 2) {
+    throw new Error('probe: routes with "owned" need two users (the owner first, then another user) in "users"');
+  }
   const results = [];
   const cookies = new Set();
   const base = cfg.baseUrl.replace(/\/$/, '');
@@ -151,10 +155,14 @@ export async function run(cfg) {
       const tooLarge = r.tooLargeStatus ?? [413];
       const sized = (n, v) => {
         const k = n - Buffer.byteLength(JSON.stringify(fill(r.body, { ...v, fuzz: '' })));
-        return k < 0 ? null : JSON.stringify(fill(r.body, { ...v, fuzz: 'x'.repeat(k) }));
+        if (k < 0) return null;
+        const body = JSON.stringify(fill(r.body, { ...v, fuzz: 'x'.repeat(k) }));
+        if (Buffer.byteLength(body) !== n) throw new Error(`probe: built a ${Buffer.byteLength(body)}-byte body for a ${n}-byte size check`);
+        return body;
       };
       const v = { id: newId() };
-      if (!JSON.stringify(r.body ?? '').includes('"{fuzz}"')) record('size limit', name, false, 'needs a body with a "{fuzz}" string field to pad');
+      const fuzzFields = (JSON.stringify(r.body ?? '').match(/"\{fuzz\}"/g) ?? []).length;
+      if (fuzzFields !== 1) record('size limit', name, false, `needs exactly one "{fuzz}" string field to pad (found ${fuzzFields})`);
       else if (sized(r.maxBytes - 1, v) === null) record('size limit', name, false, 'the valid body is already larger than maxBytes');
       else {
         const below = await send(r, v, owner, sized(r.maxBytes - 1, v));
