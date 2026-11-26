@@ -1,5 +1,6 @@
 # Outside the chain, every night: contract tests against the real external APIs, DAST against staging,
-# load + fault injection. Any failure opens (or updates) one issue. Set the STAGING_URL repository variable.
+# load + fault injection. Any failure opens (or updates) one issue. Repository variables: STAGING_URL, and
+# ALERT_ASSIGNEE (a user login; optional, the labelled issue is created either way).
 name: nightly
 on:
   schedule:
@@ -48,8 +49,15 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # A user login (repository variable). Not github.repository_owner: for an organisation that is not an
+          # assignable user, and the issue creation would fail, losing the alert.
+          ASSIGNEE: ${{ vars.ALERT_ASSIGNEE }}
         run: |
           gh label create alert:digest -R "$GITHUB_REPOSITORY" --color FBCA04 --description "Daily digest alert" --force
           n=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --label alert:digest --search "Nightly checks failing in:title" --json number -q '.[0].number')
           if [ -n "$n" ]; then gh issue comment "$n" -R "$GITHUB_REPOSITORY" --body "Failed again: $RUN"
-          else gh issue create -R "$GITHUB_REPOSITORY" --title "Nightly checks failing" --label alert:digest --assignee "$GITHUB_REPOSITORY_OWNER" --body "Contract, DAST or resilience checks failed: $RUN"; fi
+          else
+            assign=()
+            if [ -n "$ASSIGNEE" ]; then assign=(--assignee "$ASSIGNEE"); fi
+            gh issue create -R "$GITHUB_REPOSITORY" --title "Nightly checks failing" --label alert:digest "${assign[@]}" --body "Contract, DAST or resilience checks failed: $RUN"
+          fi

@@ -176,3 +176,16 @@ test('size limit: a schema rejection is not a size limit; limit-1 must pass and 
   assert.equal(check(await against(api({ limit: 500 }), [route]), 'size limit').ok, false, 'limit lower than declared rejects valid bodies');
   assert.match(check(await against(api(), [{ ...route, body: { title: 'fixed' } }]), 'size limit').detail, /\{fuzz\}/, 'needs a field to pad');
 });
+
+test('owned routes with a single configured user are a configuration error, not a silent skip', async () => {
+  await assert.rejects(run({ baseUrl: 'http://127.0.0.1:9', users: { a: { headers: { Authorization: 'Bearer a' } } },
+    routes: [{ name: 'export', method: 'POST', path: '/export/{id}', owned }] }), /two users/);
+});
+
+test('size limit: several {fuzz} fields are refused, and the bytes sent are exactly the bytes reported', async () => {
+  const two = await against(api({ limit: 100 }), [{ name: 'save', method: 'PUT', path: '/items/{id}', body: { title: '{fuzz}', note: '{fuzz}' }, maxBytes: 100 }]);
+  assert.equal(check(two, 'size limit').ok, false);
+  assert.match(check(two, 'size limit').detail, /exactly one "\{fuzz\}"/);
+  const nested = await against(api({ limit: 120 }), [{ name: 'save', method: 'PUT', path: '/items/{id}', body: { title: '{fuzz}', meta: { id: '{id}', tags: ['a', 'b'] } }, maxBytes: 120 }]);
+  assert.equal(check(nested, 'size limit').ok, true, `nested body with {id}: ${check(nested, 'size limit').detail}`);
+});

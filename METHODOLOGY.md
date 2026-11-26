@@ -146,4 +146,9 @@ data loss / integrity 4, resource leaks 3, limit bypass 2. Write tests for the a
   `templates/pins.test.mjs` now requires every forge reference in the templates to share one commit, and an
   unrecognised lockfile fails the dependency gate.
 - "Refused" proves nothing unless the same request, valid, is accepted: test the boundary from both sides.
+- Third audit (Codex, 26 Nov 2026): with one configured user, ownership checks were silently skipped (now a
+  configuration error); with several `{fuzz}` fields the size bodies were the wrong size (now exactly one field, and
+  the byte count is asserted before sending); the nightly alert assigned the issue to the repository owner, which
+  for an organisation is not an assignable user, so the alert itself failed (now an optional ALERT_ASSIGNEE).
+- A check that does not run must say so, or fail: silence reads as a pass.
 
